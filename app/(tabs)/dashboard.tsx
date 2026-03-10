@@ -9,22 +9,22 @@
  * - Daily Promo Hour card (links to Promo tab)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  RefreshControl,
-  Platform,
-  Pressable,
-  Dimensions,
-  Modal,
-  Animated,
-} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Animated,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
@@ -304,7 +304,7 @@ function ProfileDrawer({
   const handleLogOut = async () => {
     handleClose()
     await supabase.auth.signOut()
-    router.replace('/')
+    router.replace('/login')
   }
 
   const authorName = user?.full_name ?? 'Juan Dela Cruz'
