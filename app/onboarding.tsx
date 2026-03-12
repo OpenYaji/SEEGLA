@@ -1,6 +1,10 @@
 /**
- * Refactored Onboarding — Final Touch-Fix Version
- * Fix: zIndex + Button Layering to ensure Next works
+ * Refactored Onboarding — Seegla Brand Guidelines
+ * * Features:
+ * - Color Sequence: White -> Navy -> White
+ * - Highlight Cards instead of numeric stats, aligned with subtext
+ * - Dynamic Status Bar (Dark/Light based on slide)
+ * - Fix: zIndex + Button Layering to ensure Next works
  */
 
 import React, { useRef, useState } from 'react';
@@ -25,6 +29,19 @@ const { width, height } = Dimensions.get('window');
 const isShortScreen = height < 700;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Brand Colors & Theme (Official PDF Hex Codes)
+// ─────────────────────────────────────────────────────────────────────────────
+const COLORS = {
+  navy: '#0A2E5C',       
+  teal: '#16A085',       
+  orangeDark: '#F59E0B', 
+  bgGray: '#F7F9FC',     
+  white: '#FFFFFF',
+  textSecondary: '#64748B',
+  border: '#E5E7EB',
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Slide Data
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -40,64 +57,84 @@ interface Slide {
   title: string;
   body: string;
   imageSource: ImageSourcePropType;
-  stats: { iconName: keyof typeof Ionicons.glyphMap; value: string; label: string }[];
+  highlights: { iconName: keyof typeof Ionicons.glyphMap; title: string; subtitle: string }[];
   ctaText: string;
+  cardBg: string;
+  cardBorder: string;
+  cardTitleColor: string;
+  cardSubColor: string;
+  cardIconColor: string;
 }
 
 const SLIDES: Slide[] = [
   {
     id: '1',
-    bg: '#D2E3C8',
-    textColor: '#3A4D39',
-    subTextColor: '#4F6F52',
-    pillBg: '#86A789',
-    btnBg: '#3A4D39',
-    btnTextColor: '#FFFFFF',
-    pillText: 'Health Tracking',
-    title: 'Track Your\nWellness Journey',
-    body: 'Monitor steps, sleep, hydration, and mental health — all in one dashboard.',
-    imageSource: require('@/assets/images/onb1.png'),
-    stats: [
-      { iconName: 'walk-outline', value: '8,420', label: 'Steps' },
-      { iconName: 'stats-chart-outline', value: '87', label: 'Score' },
+    bg: COLORS.white, // Slide 1: White
+    textColor: COLORS.navy,
+    subTextColor: COLORS.textSecondary,
+    pillBg: COLORS.teal,
+    btnBg: COLORS.navy,
+    btnTextColor: COLORS.white,
+    pillText: 'Welcome',
+    title: 'Your Daily Wellness,\nRewarded',
+    body: "Stay healthy, join challenges, and unlock exclusive rewards — all through your company's wellness program.",
+    imageSource: require('@/assets/images/onb1.png'), 
+    highlights: [
+      { iconName: 'fitness-outline', title: 'Stay Healthy', subtitle: 'Track your daily activity' },
+      { iconName: 'gift-outline', title: 'Get Rewarded', subtitle: 'Unlock exclusive perks' },
     ],
     ctaText: 'Next',
+    cardBg: COLORS.bgGray,
+    cardBorder: COLORS.border,
+    cardTitleColor: COLORS.navy,
+    cardSubColor: COLORS.textSecondary,
+    cardIconColor: COLORS.teal,
   },
   {
     id: '2',
-    bg: '#86A789',
-    textColor: '#FFFFFF',
-    subTextColor: '#D2E3C8',
-    pillBg: '#3A4D39',
-    btnBg: '#FFFFFF',
-    btnTextColor: '#3A4D39',
-    pillText: 'Team Vitality',
-    title: 'Grow Together\nas a Team',
-    body: 'Join company challenges and build a culture of wellness with your team.',
-    imageSource: require('@/assets/images/onb2.png'),
-    stats: [
-      { iconName: 'people-outline', value: '124', label: 'Members' },
-      { iconName: 'flame-outline', value: '14d', label: 'Streak' },
+    bg: COLORS.navy, // Slide 2: Navy
+    textColor: COLORS.white,
+    subTextColor: 'rgba(255,255,255,0.75)',
+    pillBg: COLORS.orangeDark,
+    btnBg: COLORS.teal,
+    btnTextColor: COLORS.white,
+    pillText: 'Daily Promo Hour',
+    title: 'Check In Daily,\nEarn Every Night',
+    body: 'Answer 3 quick wellness questions every morning. At 8PM, your exclusive Daily Promo Hour voucher unlocks.',
+    imageSource: require('@/assets/images/onb3.png'),
+    highlights: [
+      { iconName: 'sunny-outline', title: 'Morning', subtitle: 'Quick 3-step check-in' },
+      { iconName: 'ticket-outline', title: 'Night', subtitle: '8PM voucher unlocks' },
     ],
     ctaText: 'Next',
+    cardBg: 'rgba(255,255,255,0.1)',
+    cardBorder: 'rgba(255,255,255,0.2)',
+    cardTitleColor: COLORS.white,
+    cardSubColor: 'rgba(255,255,255,0.65)',
+    cardIconColor: COLORS.orangeDark,
   },
   {
     id: '3',
-    bg: '#4F6F52',
-    textColor: '#FFFFFF',
-    subTextColor: '#D2E3C8',
-    pillBg: '#A9B388',
-    btnBg: '#3A4D39',
-    btnTextColor: '#FFFFFF',
-    pillText: 'Earn Rewards',
-    title: 'Healthy Habits\nEarn Real Perks',
-    body: 'Convert wellness points into GCash, Grab vouchers, and real rewards.',
-    imageSource: require('@/assets/images/onb3.png'),
-    stats: [
-      { iconName: 'diamond-outline', value: '2,450', label: 'Points' },
-      { iconName: 'gift-outline', value: '₱1.2k', label: 'Claimed' },
+    bg: COLORS.white, // Slide 3: White
+    textColor: COLORS.navy,
+    subTextColor: COLORS.textSecondary,
+    pillBg: COLORS.teal,
+    btnBg: COLORS.navy,
+    btnTextColor: COLORS.white,
+    pillText: 'Team Pulse',
+    title: 'Climb the Ranks,\nInspire Your Team',
+    body: 'Join company challenges, build your habit streak, and level up from Beginner to Pro.',
+    imageSource: require('@/assets/images/onb2.png'),
+    highlights: [
+      { iconName: 'trending-up-outline', title: 'Level Up', subtitle: 'From Beginner to Pro' },
+      { iconName: 'trophy-outline', title: 'Compete', subtitle: 'Join team challenges' },
     ],
     ctaText: 'Start My Journey',
+    cardBg: COLORS.bgGray,
+    cardBorder: COLORS.border,
+    cardTitleColor: COLORS.navy,
+    cardSubColor: COLORS.textSecondary,
+    cardIconColor: COLORS.teal,
   },
 ];
 
@@ -111,7 +148,6 @@ export default function OnboardingScreen() {
       await AsyncStorage.setItem('seegla_onboarding_done', 'true');
       router.replace('/login');
     } else {
-      // Direct call to scroll to the next index
       flatRef.current?.scrollToIndex({ 
         index: activeIdx + 1, 
         animated: true 
@@ -127,7 +163,8 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[root.container, { backgroundColor: slide.bg }]}>
-      <StatusBar style={activeIdx === 0 ? "dark" : "light"} />
+      {/* Slide 2 is Navy, so it needs light text. Slides 1 and 3 are White, so they need dark text. */}
+      <StatusBar style={activeIdx === 1 ? "light" : "dark"} />
 
       <FlatList
         ref={flatRef}
@@ -165,14 +202,18 @@ export default function OnboardingScreen() {
               </View>
 
               <View style={root.statsRow}>
-                {item.stats.map((stat, i) => (
-                  <View key={i} style={[root.card, item.bg !== '#D2E3C8' && root.cardDark]}>
-                    <Ionicons name={stat.iconName} size={18} color={item.bg !== '#D2E3C8' ? '#D2E3C8' : '#3A4D39'} />
-                    <Text style={[root.cardValue, { color: item.bg !== '#D2E3C8' ? '#FFF' : '#3A4D39' }]}>{stat.value}</Text>
-                    <Text style={[root.cardLabel, { color: item.bg !== '#D2E3C8' ? 'rgba(255,255,255,0.6)' : '#4F6F52' }]}>{stat.label}</Text>
+                {item.highlights.map((highlight, i) => (
+                  <View 
+                    key={i} 
+                    style={[root.card, { backgroundColor: item.cardBg, borderColor: item.cardBorder }]}
+                  >
+                    <Ionicons name={highlight.iconName} size={22} color={item.cardIconColor} />
+                    <Text style={[root.cardTitle, { color: item.cardTitleColor }]}>{highlight.title}</Text>
+                    <Text style={[root.cardSubtitle, { color: item.cardSubColor }]}>{highlight.subtitle}</Text>
                   </View>
                 ))}
               </View>
+              
               {/* Buffer for fixed button */}
               <View style={{ height: 120 }} />
             </ScrollView>
@@ -183,11 +224,18 @@ export default function OnboardingScreen() {
       {/* Pagination Dots */}
       <View style={root.dots} pointerEvents="none">
         {SLIDES.map((_, i) => (
-          <View key={i} style={[root.dot, { backgroundColor: i === activeIdx ? slide.textColor : 'rgba(0,0,0,0.1)' }, i === activeIdx && { width: 24 }]} />
+          <View 
+            key={i} 
+            style={[
+              root.dot, 
+              { backgroundColor: i === activeIdx ? slide.textColor : 'rgba(150,150,150,0.3)' }, 
+              i === activeIdx && { width: 24 }
+            ]} 
+          />
         ))}
       </View>
 
-      {/* Fixed Button Container — CRITICAL: This is the last item in the JSX to stay on top */}
+      {/* Fixed Button Container */}
       <View style={root.buttonContainer}>
         <Pressable
           onPress={goNext}
@@ -206,30 +254,46 @@ export default function OnboardingScreen() {
 
 const root = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingTop: Platform.OS === 'ios' ? 100 : 80, flexGrow: 1 },
+  scrollContent: { paddingHorizontal: 24, paddingTop: Platform.OS === 'ios' ? 80 : 60, flexGrow: 1 },
+  
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  pill: { borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
-  pillText: { fontSize: 10, fontWeight: '800', color: '#FFF', textTransform: 'uppercase' },
-  skipText: { fontSize: 14, fontWeight: '700', opacity: 0.8 },
-  title: { fontSize: isShortScreen ? 24 : 30, fontWeight: '900', lineHeight: isShortScreen ? 30 : 38, marginBottom: 8 },
-  body: { fontSize: 15, lineHeight: 22, fontWeight: '500', marginBottom: 20 },
-  imageContainer: { width: '100%', height: isShortScreen ? 160 : 220, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFF', elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, marginBottom: 20 },
+  pill: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 6 },
+  pillText: { fontSize: 10, fontWeight: '800', color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.5 },
+  skipText: { fontSize: 14, fontWeight: '700', opacity: 0.7 },
+  
+  title: { fontSize: isShortScreen ? 24 : 32, fontWeight: '900', lineHeight: isShortScreen ? 32 : 40, marginBottom: 12 },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '500', marginBottom: 24 },
+  
+  imageContainer: { 
+    width: '100%', 
+    height: isShortScreen ? 160 : 220, 
+    borderRadius: 24, 
+    overflow: 'hidden', 
+    backgroundColor: '#FFF', 
+    elevation: 4, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.08, 
+    shadowRadius: 12, 
+    marginBottom: 20 
+  },
   mainImage: { width: '100%', height: '100%' },
-  statsRow: { flexDirection: 'row', gap: 10 },
-  card: { flex: 1, borderRadius: 14, padding: 12, backgroundColor: 'rgba(255,255,255,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  cardDark: { backgroundColor: 'rgba(0, 0, 0, 0.15)', borderColor: 'rgba(255, 255, 255, 0.2)' },
-  cardValue: { fontSize: 18, fontWeight: '900', marginTop: 4 },
-  cardLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase' },
-  dots: { position: 'absolute', top: Platform.OS === 'ios' ? 60 : 45, left: 24, flexDirection: 'row', gap: 6, zIndex: 50 },
-  dot: { height: 4, borderRadius: 2, width: 8 },
+  
+  statsRow: { flexDirection: 'row', gap: 12 },
+  card: { flex: 1, borderRadius: 16, padding: 16, borderWidth: 1 },
+  cardTitle: { fontSize: 15, fontWeight: '800', marginTop: 10, marginBottom: 2 },
+  cardSubtitle: { fontSize: 12, fontWeight: '600' },
+  
+  dots: { position: 'absolute', top: Platform.OS === 'ios' ? 60 : 40, left: 24, flexDirection: 'row', gap: 6, zIndex: 50 },
+  dot: { height: 5, borderRadius: 2.5, width: 8 },
+  
   buttonContainer: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 48 : 32,
     left: 24,
     right: 24,
-    zIndex: 999,      // Ensures it is physically on top
-    elevation: 10,    // Android specific layering
+    zIndex: 999,      
+    elevation: 10,    
   },
-  btn: { height: 60, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  btn: { height: 60, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   btnText: { fontSize: 16, fontWeight: '800' },
 });

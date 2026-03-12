@@ -1,6 +1,6 @@
 /**
  * Login — Sign In / Sign Up
- * Theme: SEEGLA Moss & Forest
+ * Theme: SEEGLA Brand Guidelines (Navy & Teal)
  */
 
 import React, { useState } from 'react'
@@ -30,13 +30,17 @@ WebBrowser.maybeCompleteAuthSession()
 
 const { width } = Dimensions.get('window')
 
-// Palette updated with your requested color
+// ─────────────────────────────────────────────────────────────────────────────
+// Brand Colors & Theme (Official PDF Hex Codes)
+// ─────────────────────────────────────────────────────────────────────────────
 const COLORS = {
-  primaryDark: '#3A4D39',    // Dark logo green (Updated)
-  primaryForest: '#4F6F52',  // Medium forest
-  secondarySage: '#86A789',  // Muted sage
-  neutralTaupe: '#A9B388',   // Olive
-  background: '#D2E3C8',     // Moss Background
+  navy: '#0A2E5C',       
+  teal: '#16A085',       
+  orangeDark: '#F59E0B', 
+  bgGray: '#F7F9FC',     
+  white: '#FFFFFF',
+  textSecondary: '#64748B',
+  border: '#E5E7EB',
 }
 
 async function afterLogin() {
@@ -111,7 +115,7 @@ function SignInForm() {
       <View style={f.fieldGroup}>
         <Text style={f.label}>Work Email</Text>
         <View style={f.inputRow}>
-          <Ionicons name="mail-outline" size={17} color={COLORS.secondarySage} style={f.inputIcon} />
+          <Ionicons name="mail-outline" size={17} color={COLORS.textSecondary} style={f.inputIcon} />
           <TextInput
             style={f.input}
             placeholder="juan@company.com.ph"
@@ -127,7 +131,7 @@ function SignInForm() {
       <View style={f.fieldGroup}>
         <Text style={f.label}>Password</Text>
         <View style={f.inputRow}>
-          <Ionicons name="lock-closed-outline" size={17} color={COLORS.secondarySage} style={f.inputIcon} />
+          <Ionicons name="lock-closed-outline" size={17} color={COLORS.textSecondary} style={f.inputIcon} />
           <TextInput
             style={[f.input, { flex: 1 }]}
             placeholder="••••••••"
@@ -228,7 +232,7 @@ function SignUpForm() {
       <View style={f.fieldGroup}>
         <Text style={f.label}>Full Name</Text>
         <View style={f.inputRow}>
-          <Ionicons name="person-outline" size={17} color={COLORS.secondarySage} style={f.inputIcon} />
+          <Ionicons name="person-outline" size={17} color={COLORS.textSecondary} style={f.inputIcon} />
           <TextInput
             style={f.input}
             placeholder="Juan dela Cruz"
@@ -242,7 +246,7 @@ function SignUpForm() {
       <View style={f.fieldGroup}>
         <Text style={f.label}>Work Email</Text>
         <View style={f.inputRow}>
-          <Ionicons name="mail-outline" size={17} color={COLORS.secondarySage} style={f.inputIcon} />
+          <Ionicons name="mail-outline" size={17} color={COLORS.textSecondary} style={f.inputIcon} />
           <TextInput
             style={f.input}
             placeholder="juan@company.com.ph"
@@ -258,7 +262,7 @@ function SignUpForm() {
       <View style={f.fieldGroup}>
         <Text style={f.label}>Password</Text>
         <View style={f.inputRow}>
-          <Ionicons name="lock-closed-outline" size={17} color={COLORS.secondarySage} style={f.inputIcon} />
+          <Ionicons name="lock-closed-outline" size={17} color={COLORS.textSecondary} style={f.inputIcon} />
           <TextInput
             style={[f.input, { flex: 1 }]}
             placeholder="••••••••"
@@ -321,14 +325,19 @@ const f = StyleSheet.create({
   input: { flex: 1, fontSize: 15, color: '#0f172a', padding: 0 },
   eyeBtn: { paddingLeft: 8 },
   forgotWrap: { alignSelf: 'flex-end', marginTop: -4 },
-  forgotText: { fontSize: 12, color: COLORS.primaryForest, fontWeight: '700' },
+  forgotText: { fontSize: 12, color: COLORS.teal, fontWeight: '700' },
   primaryBtn: {
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: COLORS.navy,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
+    shadowColor: COLORS.teal,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   primaryBtnText: { fontSize: 16, fontWeight: '800', color: '#ffffff' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
@@ -415,7 +424,7 @@ export default function LoginScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.navy,
   },
   header: {
     alignItems: 'center',
@@ -430,8 +439,8 @@ const s = StyleSheet.create({
   },
   headerSub: {
     fontSize: 14,
-    color: '#000000',
-    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
     textAlign: 'center',
   },
   card: {
@@ -456,7 +465,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   tabBtnActive: {
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: COLORS.navy,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tabBtnText: {
     fontSize: 14,
@@ -474,7 +488,7 @@ const s = StyleSheet.create({
     marginTop: 20,
   },
   footerLink: {
-    color: COLORS.primaryForest,
+    color: COLORS.teal,
     fontWeight: '700',
   },
 })

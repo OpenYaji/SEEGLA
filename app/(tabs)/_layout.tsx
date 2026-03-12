@@ -2,56 +2,83 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { HapticTab } from '@/components/haptic-tab';
 
-// Center Promo button
+// ─────────────────────────────────────────────────────────────────────────────
+// Brand Colors
+// ─────────────────────────────────────────────────────────────────────────────
+const COLORS = {
+  navy: '#1E2356',      // Added Navy for the "Burger" layout
+  teal: '#00C4C7',
+  purple: '#6244CB',
+  inactive: '#94A3B8',  // Slate gray looks great on dark backgrounds
+  white: '#FFFFFF',
+  border: 'rgba(255, 255, 255, 0.08)', // Subtle light border for dark background
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Center Promo Button
+// ─────────────────────────────────────────────────────────────────────────────
 function PromoTabIcon({ focused }: { focused: boolean }) {
   return (
-    <View style={[promoBtn.wrap, focused && promoBtn.wrapActive]}>
-      <Ionicons name="flame" size={26} color="#fff" />
+    <View style={promoBtn.wrap}>
+      <LinearGradient
+        colors={[COLORS.purple, COLORS.teal]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={promoBtn.circle}
+      >
+        <Ionicons name="gift-outline" size={26} color={COLORS.white} />
+      </LinearGradient>
     </View>
   );
 }
 
 const promoBtn = StyleSheet.create({
   wrap: {
-    width:           54,
-    height:          54,
-    borderRadius:    27,
-    backgroundColor: '#FF6B00',
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    Platform.OS === 'ios' ? 14 : 8,
-    shadowColor:     '#FF6B00',
-    shadowOffset:    { width: 0, height: 4 },
-    shadowOpacity:   0.45,
-    shadowRadius:    8,
-    elevation:       8,
+    // Pushes the circle up so it sits higher than the standard icons
+    marginBottom: Platform.OS === 'ios' ? 14 : 20, 
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  wrapActive: {
-    backgroundColor: '#e55f00',
+  circle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000', // Changed shadow to black for better depth on navy background
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Tab Layout
+// ─────────────────────────────────────────────────────────────────────────────
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor:   '#3FE870',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarActiveTintColor:   COLORS.teal,
+        tabBarInactiveTintColor: COLORS.inactive,
         headerShown:             false,
         tabBarButton:            HapticTab,
         tabBarStyle: {
           borderTopWidth:  1,
-          borderTopColor:  '#f1f5f9',
-          backgroundColor: '#ffffff',
-          height:          Platform.OS === 'ios' ? 84 : 64,
-          paddingBottom:   Platform.OS === 'ios' ? 24 : 8,
-          paddingTop:      4,
+          borderTopColor:  COLORS.border,
+          backgroundColor: COLORS.navy, // Changed to Navy for the Burger layout
+          height:          Platform.OS === 'ios' ? 88 : 68,
+          paddingBottom:   Platform.OS === 'ios' ? 28 : 10,
+          paddingTop:      8,
         },
         tabBarLabelStyle: {
           fontSize:   10,
-          fontWeight: '600',
+          fontWeight: '700',
+          marginTop:  2,
         },
       }}
     >
@@ -59,7 +86,7 @@ export default function TabLayout() {
         name="dashboard"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
@@ -69,8 +96,8 @@ export default function TabLayout() {
         name="feed"
         options={{
           title: 'Feed',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbox-outline" size={size} color={color} />
           ),
         }}
       />
@@ -79,20 +106,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="promo"
         options={{
-          title: '',
-          tabBarIcon: ({ focused }: { focused: boolean }) => (
+          title: 'Promo', 
+          tabBarIcon: ({ focused }) => (
             <PromoTabIcon focused={focused} />
           ),
-          tabBarLabel: () => null,
         }}
       />
 
       <Tabs.Screen
         name="pulse"
         options={{
-          title: 'Pulse',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="stats-chart-outline" size={size} color={color} />
+          title: 'Challenges',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-outline" size={size} color={color} />
           ),
         }}
       />
@@ -101,13 +127,13 @@ export default function TabLayout() {
         name="rewards"
         options={{
           title: 'Rewards',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="gift-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="ribbon-outline" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Hidden */}
+      {/* Hidden Screens */}
       <Tabs.Screen name="index"   options={{ href: null }} />
       <Tabs.Screen name="explore" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />

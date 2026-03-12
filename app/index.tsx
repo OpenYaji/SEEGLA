@@ -1,6 +1,7 @@
 /**
  * Refactored Splash Screen — SEEGLA
  * Fix: Forced Onboarding Path & Logo Centered/Enlarged
+ * Updated: Color Palette matched to Seegla Brand Guidelines
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -31,12 +32,15 @@ import { useAuth } from '@/lib/auth-context';
 
 const { width, height } = Dimensions.get('window');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Brand Colors & Theme (Seegla Official)
+// ─────────────────────────────────────────────────────────────────────────────
 const COLORS = {
-  primaryDark: '#3A4D39',    // Dark logo green
-  primaryForest: '#4F6F52',  // Medium forest
-  secondarySage: '#86A789',  // Muted sage
-  neutralTaupe: '#A9B388',   // Olive
-  background: '#D2E3C8',     // Moss Background
+  navy: '#1E2356',       // Brand anchor, headings
+  teal: '#00C4C7',       // Primary actions
+  bgGray: '#F7F9FC',     // App background
+  white: '#FFFFFF',      // Cards and text on dark backgrounds
+  textSecondary: '#64748B', // Subtitles and body text
 };
 
 export default function SplashScreen() {
@@ -74,7 +78,7 @@ export default function SplashScreen() {
     badgeOpacity.value = withDelay(100, withTiming(1, { duration: 600 }));
     badgeY.value = withDelay(100, withTiming(0, { duration: 600, easing: Easing.out(Easing.quad) }));
     logoOpacity.value = withDelay(300, withTiming(1, { duration: 800 }));
-    logoScale.value = withDelay(300, withSpring(1.15, { damping: 12, stiffness: 90 })); // Sightly more bounce and larger initial scale
+    logoScale.value = withDelay(300, withSpring(1.15, { damping: 12, stiffness: 90 })); 
     textOpacity.value = withDelay(700, withTiming(1, { duration: 600 }));
     textY.value = withDelay(700, withTiming(0, { duration: 600 }));
     btnOpacity.value = withDelay(1000, withTiming(1, { duration: 500 }));
@@ -102,13 +106,12 @@ export default function SplashScreen() {
     hasNavigated.current = true;
 
     // We navigate directly to onboarding. 
-    // The onboarding screen itself should handle the 'seen' logic 
-    // or redirect to login at the very end of its flow.
     router.replace('/onboarding');
   };
 
   return (
     <View style={s.root}>
+      {/* Dark text for the status bar since background is light gray */}
       <StatusBar style="dark" />
 
       {/* Centered Logo Container */}
@@ -131,7 +134,7 @@ export default function SplashScreen() {
 
       <Animated.View style={[s.ctaContainer, btnStyle]}>
         {isLoading ? (
-          <ActivityIndicator size="large" color={COLORS.primaryForest} />
+          <ActivityIndicator size="large" color={COLORS.teal} />
         ) : (
           <Pressable
             onPress={handleGetStarted}
@@ -141,7 +144,7 @@ export default function SplashScreen() {
             ]}
           >
             <Text style={s.primaryBtnText}>Get Started</Text>
-            <Ionicons name="arrow-forward" size={20} color={COLORS.secondarySage} />
+            <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
           </Pressable>
         )}
       </Animated.View>
@@ -152,24 +155,22 @@ export default function SplashScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bgGray,
     paddingHorizontal: 32,
   },
   centerContainer: {
-    flex: 1, // Takes up remaining space above the fixed button
-    justifyContent: 'center', // Vertically center children
+    flex: 1, 
+    justifyContent: 'center', 
     alignItems: 'center',
-    // Slight upward offset to visually center better against the bottom CTA
     marginTop: -height * 0.05, 
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 10, // Reduced bottom margin
+    marginBottom: 10, 
   },
   logoImage: {
-    width: 160, // Increased width (bigger logo)
-    height: 190, // Increased height
-    // Removed negative margins that were pulling it up/down
+    width: 160, 
+    height: 190, 
     marginBottom: 0,
     marginTop: 0,
   },
@@ -177,52 +178,52 @@ const s = StyleSheet.create({
   messageBlock: {
     alignItems: 'center',
     gap: 16,
-    marginTop: 10, // Added space between logo and text
+    marginTop: 10, 
   },
   tagline: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
-    color: COLORS.primaryDark,
-    letterSpacing: 1.2,
+    color: COLORS.navy,
+    letterSpacing: 1.5,
     textAlign: 'center',
   },
   bodyText: {
     fontSize: 15,
-    color: COLORS.primaryDark,
-    opacity: 0.8,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
     textAlign: 'center',
     lineHeight: 24,
   },
   ctaContainer: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 60 : 40,
-    width: width, // Full screen width for proper centering
-    alignSelf: 'center', // Center the absolute container
+    width: width, 
+    alignSelf: 'center', 
     alignItems: 'center',
-    paddingHorizontal: 32, // Re-apply padding within the container
+    paddingHorizontal: 32, 
   },
   primaryBtn: {
     width: '85%',
-    backgroundColor: COLORS.primaryDark, // Darker button for better contrast on Moss BG
+    backgroundColor: COLORS.navy, // Bright engaging action color
     borderRadius: 16,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowColor: COLORS.navy,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   btnPressed: {
     opacity: 0.9,
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.96 }],
   },
   primaryBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.white,
   },
 });

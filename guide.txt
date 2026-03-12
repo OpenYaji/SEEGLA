@@ -1,0 +1,665 @@
+
+Seegla Color Guidelines
+1. Core Brand Colors
+These should appear in every product surface.
+Color
+Hex
+Role
+Navy
+#0A2E5C
+Brand anchor, headings, enterprise feel
+Teal
+#16A085
+Primary actions and engagement
+Green
+#4CAF7A
+Health progress and positive outcomes
+
+These three communicate the core message:
+Trust (navy) + wellness (green) + engagement (teal)
+
+2. Accent Colors
+Used sparingly to highlight motivation and achievements.
+Color
+Hex
+Usage
+Orange
+#F59E0B
+Rewards, achievements, badges
+
+Rule:
+Orange should only appear when something good happens.
+Examples:
+Reward unlocked
+Challenge completed
+Points earned
+This makes rewards feel valuable and exciting.
+
+3. Neutral Colors
+For UI structure and readability.
+Color
+Hex
+Usage
+Light Gray
+#F7F9FC
+App background
+White
+#FFFFFF
+Cards and panels
+
+Optional supporting neutrals (recommended):
+Color
+Hex
+Usage
+Slate Gray
+#64748B
+Secondary text
+Border Gray
+#E5E7EB
+Dividers
+
+
+4. Decorative Gradient
+Your gradient should only appear in high-engagement areas.
+Gradient:
+Purple → Teal → Amber
+#6C4DD9 → #16A085 → #F59E0B
+
+Good uses:
+Reward cards
+Progress rings
+Celebration animations
+App onboarding
+Gamification elements
+Avoid using gradients in:
+Data dashboards
+Tables
+HR reports
+Those should remain clean and professional.
+
+5. Employee App Color Usage
+Employees should feel energy and motivation.
+Recommended distribution:
+Background: Light Gray (#F7F9FC)
+Cards: White
+Primary Buttons: Teal (#16A085)
+Progress Indicators: Green (#4CAF7A)
+Rewards: Orange (#F59E0B)
+Celebration Effects: Gradient
+
+Example:
+Daily progress ring
+progress color → Green
+track → Light gray
+milestone → Orange
+
+6. Employer Dashboard Color Usage
+Employers care about clarity and insights, not gamification.
+Recommended structure:
+Background
+#FFFFFF
+Section panels
+#F7F9FC
+Graphs
+Metric
+Color
+Engagement
+Teal
+Health improvement
+Green
+Rewards spending
+Orange
+Alerts
+Red
+
+Navy should be used for:
+Titles
+navigation
+important numbers
+
+7. Color Ratio (Important)
+This prevents the design from becoming chaotic.
+Recommended ratio:
+60% white / light gray
+25% navy text and structure
+10% teal actions
+3% green progress
+2% orange rewards
+
+Purple should stay rare, only in gradients.
+
+8. Accessibility
+Text colors:
+Primary text
+#0A2E5C
+Secondary text
+#64748B
+Disabled text
+#94A3B8
+Always ensure:
+Minimum 4.5:1 contrast ratio.
+
+9. Icon System
+Icons should follow the color logic:
+Health → Green
+Engagement → Teal
+Rewards → Orange
+Insights → Navy
+This helps users understand features quickly.
+
+10. Brand Feeling
+Your palette creates a specific emotional tone:
+Navy → enterprise trust
+Green → health outcomes
+Teal → collaboration
+Orange → motivation
+Purple gradient → modern tech energy
+This is very appropriate for a corporate wellness startup.
+
+—------------------------------------------------------
+Seegla Font Guidelines
+1. Primary Font
+Recommended font:
+Inter
+Why it works:
+Designed for digital interfaces
+
+
+Extremely readable on mobile
+
+
+Professional enough for enterprise dashboards
+
+
+Widely used in SaaS products
+
+
+Use Inter for:
+App UI
+
+
+Dashboard
+
+
+Buttons
+
+
+Body text
+
+
+Navigation
+
+
+Font weights to use:
+Weight
+Usage
+Medium (500)
+Buttons and labels
+SemiBold (600)
+Section titles
+Bold (700)
+Key numbers and headings
+Regular (400)
+Body text
+
+
+2. Secondary Font (Optional)
+If you want a slightly more friendly tone for marketing or gamification.
+Recommended:
+Poppins
+Use for:
+Marketing website
+
+
+Promotional banners
+
+
+Reward cards
+
+
+Campaign graphics
+
+
+Do not use it in the dashboard tables because it is less readable in dense data.
+
+3. Font Sizes (Mobile App)
+Consistency is important.
+Style
+Size
+Weight
+Page Title
+24 px
+Bold
+Section Title
+18 px
+SemiBold
+Card Title
+16 px
+SemiBold
+Body Text
+14 px
+Regular
+Caption
+12 px
+Regular
+
+
+4. Font Sizes (Dashboard)
+Dashboards need slightly larger hierarchy.
+Style
+Size
+Weight
+Dashboard Title
+28 px
+Bold
+Section Header
+20 px
+SemiBold
+Card Title
+16 px
+SemiBold
+Table Text
+14 px
+Regular
+Metadata
+12 px
+Regular
+
+
+5. Special Typography (Key Metrics)
+Important numbers should stand out.
+Examples:
+Employee participation
+ Steps completed
+ Rewards redeemed
+Use:
+Font weight: Bold
+ Color: Navy #0A2E5C
+Example:
+2,458
+ Employees Active Today
+
+6. Rewards Typography
+Rewards should feel exciting.
+Example card:
+₱50 GrabFood Voucher
+Style:
+Font: Inter Bold
+ Color: Orange #F59E0B
+
+7. Button Text Rules
+Buttons should always use:
+Weight: Medium
+Examples:
+Join Challenge
+ Redeem Reward
+ Unlock Voucher
+Avoid long text.
+
+8. Line Height
+Proper spacing improves readability.
+Text
+Line Height
+Headings
+120%
+Body text
+140%
+Small text
+150%
+
+
+9. Letter Spacing
+Use subtle spacing for modern feel.
+Headings:
+ 0 to -1%
+Buttons:
+ +1%
+Numbers:
+ 0%
+
+10. Typography Personality
+Your system communicates:
+Inter → modern SaaS product
+ Poppins → friendly wellness tone
+Together they create a brand that feels:
+Professional + motivating + modern
+Which is exactly what a corporate wellness platform should feel like.
+
+
+
+
+
+Updated Seegla App Structure
+1. Home Screen (Daily Engagement Hub)
+This is where Daily Promo Hour, Check-in, and Progress live.
+Top Section
+Greeting + streak
+Example:
+Good morning, Jenzele
+🔥 5 Day Streak > after 3 days the streak will activate and will notify other so that they will be inspired to catch up to you so they can use the app too.
+
+Daily Check-in Card
+Employees answer 3 quick questions.
+Example:
+How do you feel today
+🙂 😐 😞
+Energy level
+Low | Medium | High
+Did you sleep well
+Yes / No
+Reward:
++10 points for completing check-in.
+This helps companies track employee wellbeing trends.
+
+Daily Promo Hour
+This should be highly visible.
+Example card:
+Daily Promo Hour
+Unlock today's reward
+Button:
+Unlock Voucher
+If they logged in today:
+Example reward options
+₱20 GrabFood
+₱25 GCash
+Free coffee voucher
+This becomes the daily reason to open the app.
+
+Progress Section
+Daily goal ring
+Example:
+Steps
+Hydration
+Check-in completed
+
+2. Activity Feed (Social Layer)
+Your feed is very important for retention.
+This should appear as a separate tab.
+Feed content
+Employees can post:
+Walk achievements
+Challenge completion
+Team wins
+Motivation posts
+Example post:
+“Just finished 10k steps today!”
+Example system post:
+“Finance Team just completed the 100k step challenge.”
+
+Interactions
+Like
+Comment
+Celebrate 🎉
+This makes wellness social instead of lonely.
+
+3. Challenges Tab
+Structured challenges:
+Daily
+Weekly
+Team
+Example:
+Walk 8,000 steps today
+Drink 6 glasses of water
+Meditate for 5 minutes
+Completion rewards:
+Points
+Leaderboard rank
+
+4. Leaderboard
+Leaderboards create friendly competition.
+Types:
+Individual ranking
+Department ranking
+Company ranking
+Example:
+Marketing Team
+Finance Team
+Sales Team
+
+5. Rewards Marketplace
+This is where points convert to real value.
+Rewards examples:
+GCash credits
+Grab vouchers
+Food vouchers
+Fitness rewards
+Reward cards should show:
+Points required
+Availability
+Redeem button
+
+6. Profile & Achievements
+Employee personal progress.
+Show:
+Total points earned
+Rewards redeemed
+Wellness streak
+Badges
+Example badges:
+7 Day Streak
+Challenge Champion
+Early Bird
+
+Company-Funded Rewards (Important Feature)
+You should absolutely allow companies to fund rewards themselves.
+This solves a big business problem:
+Companies want budget control.
+
+How the Funding System Should Work
+HR Dashboard Feature
+Section:
+Reward Wallet
+Example:
+Company Wallet Balance
+₱50,000
+
+HR Actions
+Load funds
+Set reward budget
+Allocate rewards
+Example:
+GCash vouchers
+₱20 each
+500 available
+
+Daily Promo Hour Budget
+HR can configure:
+Daily reward budget
+Max vouchers per day
+Example:
+Daily Promo Hour
+100 vouchers available
+
+Reward Funding Models
+Company Funded
+Company loads credits.
+Example:
+₱30,000 monthly wellness budget.
+Rewards come from that wallet.
+
+Your Core Engagement Loop
+Your current features already create a very strong loop.
+Daily flow:
+1 Open app
+2 Complete check-in
+3 Unlock Daily Promo Hour
+4 See feed activity
+5 Participate in challenge
+6 Earn points
+Then repeat tomorrow.
+
+Why This Is Actually a Strong Product
+You combine four retention drivers:
+Daily check-in → habit
+Promo hour → reward anticipation
+Feed → social engagement
+Challenges → competition
+Most wellness apps only have one or two.
+You already have four.
+
+A strong onboarding flow is critical for Seegla because employees will only keep using the app if the first experience is fast, rewarding, and clear. The goal is to get them to their first reward within the first 60 seconds.
+Below is the ideal onboarding structure for Seegla.
+
+Seegla Onboarding Flow
+1. Welcome Screen
+Purpose: Introduce the value quickly.
+Layout
+Logo
+Headline
+Short explanation
+CTA button
+Example copy:
+Headline
+Your daily wellness, rewarded
+Subtext
+Stay healthy, join challenges, and unlock rewards.
+Button
+Get Started
+Keep this screen simple. Avoid long explanations.
+
+2. Company Verification
+Employees join through their company.
+Options
+
+Company email
+QR invite link
+Example flow:
+Enter company code
+or
+Continue with work email
+This connects them to:
+their company challenges
+company rewards
+their department leaderboard
+
+3. Profile Setup
+This step should take less than 20 seconds.
+Required:
+Name
+Department
+Profile avatar (optional)
+Optional wellness interests:
+Walking
+Running
+Yoga
+Meditation
+These preferences help personalize challenges later.
+
+4. Connect Health Data
+This powers the automatic activity tracking.
+Options:
+Apple Health
+Google Fit
+Fitbit (optional)
+Message example:
+Connect your health data so Seegla can track your steps automatically.
+Button:
+Connect Now
+Also allow:
+Skip for now
+Never force it.
+
+5. First Daily Check-in
+Immediately introduce the daily habit.
+Three quick questions:
+How do you feel today
+🙂 😐 😞
+Energy level
+Low | Medium | High
+Sleep quality
+Good | Okay | Poor
+After submission:
+Animation
++10 points earned
+This gives the user instant gratification.
+
+6. Daily Promo Hour (First Reward)
+This is your hook moment.
+Show a card:
+🎉 Welcome reward available
+Example:
+Unlock your first reward today.
+Button:
+Unlock Voucher
+Example reward:
+₱20 GCash
+Free coffee voucher
+Once unlocked:
+Confetti animation
+Points added
+Now the user understands:
+Logging in daily gives rewards.
+
+7. Join Your First Challenge
+Now guide them into ongoing engagement.
+Example challenge:
+8,000 Steps Today
+Reward:
++50 points
+Button:
+Join Challenge
+Progress bar starts immediately.
+
+8. Show the Leaderboard
+People become curious when they see competition.
+Example message:
+You're currently #23 in your department
+Top teams this week:
+1 Marketing Team
+2 Finance Team
+3 Sales Team
+This triggers competitive motivation.
+
+Top employees this week:
+1. Juan
+2. Ana
+3. Sarah
+
+You're currently #50 in your company
+
+
+9. Introduce the Feed
+Show the social element.
+Example posts:
+“Mark completed the 10k step challenge.”
+“Finance team just reached 100k steps.”
+Prompt:
+Share your first post.
+Button:
+Post your first activity
+
+10. Final Screen
+Reinforce the daily habit.
+Example message:
+You're all set.
+Complete your daily check-in and unlock rewards every day.
+Button:
+Go to Dashboard
+
+Ideal Onboarding Length
+Keep the entire onboarding under 90 seconds.
+Steps summary:
+1 Welcome
+2 Join company
+3 Profile
+4 Connect health data
+5 First check-in
+6 Unlock reward
+7 Join challenge
+
+The Psychological Strategy
+Your onboarding triggers four motivations:
+Reward → Daily Promo Hour
+Progress → Challenges
+Competition → Leaderboard
+Community → Feed
+This dramatically increases daily active users.
+
+One Critical Trick for Retention
+Send a notification every day before the Daily Promo Hour.
+Example:
+“Today's Seegla reward is live. Unlock it now.”
+This creates anticipation.
+
+
+

@@ -1,36 +1,53 @@
 /**
- * Team Pulse — mobile screen
+ * Challenges & Leaderboard Screen 
  *
- * Ports SEEGLA-WEB/components/vitality/TeamPulse.tsx +
- *       SEEGLA-WEB/app/(dashboard)/employee/dashboard/leaderboard/page.tsx
- *
- * Combines both web views into one screen:
- *  Section 1 — Top Habit Streaks leaderboard (from TeamPulse)
- *  Section 2 — Steps Leaderboard: last 30 days (from LeaderboardPage)
- *
- * Profile Rating Tags (Beginner / Veteran / Pro) are rendered on every row.
+ * - Navy header with Daily/Weekly/Team challenge toggles
+ * - Challenge cards with progress bars and "Join" buttons
+ * - Leaderboard section using the classic gamified design (Trophies & Rank Chips)
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   ActivityIndicator,
   Platform,
   RefreshControl,
+  Pressable,
+  ScrollView
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 
 import { useAuth } from '@/lib/auth-context'
-import { supabase } from '@/lib/supabase'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config
+// Brand Colors & Theme
+// ─────────────────────────────────────────────────────────────────────────────
+const COLORS = {
+  navy: '#1E2356',     
+  teal: '#00C4C7',     
+  purple: '#6244CB',   
+  orange: '#FFB185',   
+  orangeDark: '#F59E0B',
+  green: '#4CAF7A',    
+  lightGreen: '#E8F5E9',
+  lightTeal: '#E6FDFD',
+  bgGray: '#F7F9FC',   
+  white: '#FFFFFF',
+  textPrimary: '#1E2356',
+  textSecondary: '#64748B',
+  border: '#E5E7EB',
+  disabledText: '#94A3B8'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Config & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ChallengeTab = 'daily' | 'weekly' | 'team'
+type LeaderboardTab = 'individual' | 'department' | 'company'
 type RankKey = 'beginner' | 'veteran' | 'pro'
 
 const RANK: Record<RankKey, {
@@ -42,622 +59,296 @@ const RANK: Record<RankKey, {
 }> = {
   beginner: {
     label: 'Beginner', icon: 'leaf-outline',
-    borderColor: '#e2e8f0', bgColor: '#f1f5f9', textColor: '#334155',
+    borderColor: COLORS.green, bgColor: COLORS.lightGreen, textColor: '#15803d',
   },
   veteran: {
     label: 'Veteran',  icon: 'flash-outline',
-    borderColor: '#bfdbfe', bgColor: '#dbeafe', textColor: '#1d4ed8',
+    borderColor: COLORS.teal, bgColor: COLORS.lightTeal, textColor: '#0e7490',
   },
   pro: {
     label: 'Pro',      icon: 'trophy-outline',
-    borderColor: '#fde68a', bgColor: '#fef3c7', textColor: '#b45309',
+    borderColor: COLORS.orangeDark, bgColor: '#FFF8E1', textColor: '#b45309',
   },
 }
 
-const METRIC: Record<string, {
-  label:     string
-  icon:      keyof typeof Ionicons.glyphMap
-  textColor: string
-}> = {
-  water:      { label: 'Hydration', icon: 'water-outline',      textColor: '#0891b2' },
-  steps:      { label: 'Steps',     icon: 'footsteps-outline',   textColor: '#2563eb' },
-  exercise:   { label: 'Exercise',  icon: 'pulse-outline',       textColor: '#059669' },
-  sleep:      { label: 'Sleep',     icon: 'moon-outline',        textColor: '#7c3aed' },
-  nutrition:  { label: 'Nutrition', icon: 'leaf-outline',        textColor: '#4d7c0f' },
-  meditation: { label: 'Mindful',   icon: 'analytics-outline',   textColor: '#c2410c' },
+const POSITION_COLORS = [COLORS.orangeDark, COLORS.textSecondary, COLORS.orange, COLORS.disabledText]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mock Data
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MOCK_CHALLENGES = {
+  daily: [
+    { id: '1', title: 'Walk 8,000 Steps', sub: 'Track your steps via Google Fit', category: 'Movement', time: 'Ends tonight', points: 50, icon: '🚶', iconBg: COLORS.lightGreen, progress: 72, joined: true },
+    { id: '2', title: 'Drink 6 Glasses of Water', sub: 'Stay hydrated throughout the day', category: 'Hydration', time: 'Ends tonight', points: 30, icon: '💧', iconBg: '#E0F2FE', progress: 66, joined: true },
+    { id: '3', title: 'Meditate for 5 Minutes', sub: 'Find calm in the middle of your day', category: 'Mental', time: 'Ends tonight', points: 40, icon: '🧘', iconBg: '#FEF3C7', progress: 0, joined: false },
+  ],
+  weekly: [
+    { id: '4', title: 'Log 50,000 Steps', sub: 'Cumulative weekly step count', category: 'Movement', time: '4 days left', points: 200, icon: '👟', iconBg: '#F3E8FF', progress: 58, joined: true },
+    { id: '5', title: 'Complete 5 Check-ins', sub: 'Answer your morning wellness check-in', category: 'Wellbeing', time: '4 days left', points: 100, icon: '✅', iconBg: COLORS.lightGreen, progress: 80, joined: true },
+    { id: '6', title: 'Sleep 7+ Hours x3', sub: 'Track sleep via Health Connect', category: 'Recovery', time: '4 days left', points: 80, icon: '😴', iconBg: '#FFEDD5', progress: 0, joined: false },
+  ],
+  team: [
+    { id: '7', title: 'IT Dept: 100k Steps', sub: 'Your department’s combined step goal', category: 'Team', time: '5 days left', points: 500, icon: '🏢', iconBg: '#E2E8F0', progress: 64, joined: true },
+    { id: '8', title: 'March Wellness Sprint', sub: 'Company-wide challenge this month', category: 'Company', time: '19 days left', points: 350, icon: '🏃', iconBg: '#FEF3C7', progress: 41, joined: true },
+    { id: '9', title: 'Hydration Heroes', sub: 'Team-based hydration challenge', category: 'Team', time: '5 days left', points: 250, icon: '💦', iconBg: '#E0F2FE', progress: 0, joined: false },
+  ]
 }
 
-const POSITION_COLORS = ['#d97706', '#64748b', '#c2410c', '#94a3b8'] // gold, silver, bronze, rest
+const MOCK_LEADERBOARD = [
+  { id: 'l1', rank: 1, name: 'Ana Reyes', dept: 'Marketing', points: 2840, rankKey: 'pro' as RankKey },
+  { id: 'l2', rank: 2, name: 'Paulo Cruz', dept: 'Sales', points: 2615, rankKey: 'veteran' as RankKey },
+  { id: 'l3', rank: 3, name: 'Marco Santos', dept: 'IT', points: 2480, rankKey: 'veteran' as RankKey },
+  { id: 'l4', rank: 4, name: 'Ria dela Cruz', dept: 'HR', points: 2200, rankKey: 'beginner' as RankKey },
+]
+
+const MOCK_ME = { id: 'me', rank: 50, name: 'You (Jenzele)', dept: 'IT', points: 1240, rankKey: 'beginner' as RankKey }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types
+// Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface StreakEntry {
-  id:             string
-  metric_type:    string
-  current_streak: number
-  longest_streak: number
-  users: {
-    full_name:     string | null
-    department:    string | null
-    wellness_rank: string | null
-  } | null
-}
-
-interface StepsEntry {
-  user_id:                string
-  full_name:              string
-  total_steps:            number
-  total_exercise_minutes: number
-  avg_sleep_hours:        number
-  days_logged:            number
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stat card
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub: string }) {
+function ProgressBar({ progress }: { progress: number }) {
   return (
-    <View style={statStyles.card}>
-      <Text style={statStyles.value}>{value}</Text>
-      <Text style={statStyles.label}>{label}</Text>
-      <Text style={statStyles.sub}>{sub}</Text>
+    <View style={s.progressTrack}>
+      <View style={[s.progressFill, { width: `${progress}%` }]} />
     </View>
   )
 }
-
-const statStyles = StyleSheet.create({
-  card: {
-    flex:            1,
-    borderRadius:    12,
-    borderWidth:     1,
-    borderColor:     '#e2e8f0',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  value: {
-    fontSize:   18,
-    fontWeight: '800',
-    color:      '#0f172a',
-    lineHeight: 22,
-  },
-  label: {
-    fontSize:   11,
-    fontWeight: '600',
-    color:      '#334155',
-    marginTop:  3,
-    lineHeight: 14,
-  },
-  sub: {
-    fontSize:  10,
-    color:     '#94a3b8',
-    marginTop: 1,
-  },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Rank chip (reused by both leaderboards)
-// ─────────────────────────────────────────────────────────────────────────────
 
 function RankChip({ rank }: { rank: string }) {
   const cfg = RANK[(rank as RankKey)] ?? RANK.beginner
   return (
-    <View style={[chipStyles.chip, { borderColor: cfg.borderColor, backgroundColor: cfg.bgColor }]}>
+    <View style={[chip.chip, { borderColor: cfg.borderColor, backgroundColor: cfg.bgColor }]}>
       <Ionicons name={cfg.icon} size={8} color={cfg.textColor} />
-      <Text style={[chipStyles.text, { color: cfg.textColor }]}>{cfg.label}</Text>
+      <Text style={[chip.text, { color: cfg.textColor }]}>{cfg.label}</Text>
     </View>
   )
 }
 
-const chipStyles = StyleSheet.create({
+const chip = StyleSheet.create({
   chip: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    gap:              3,
-    borderRadius:     99,
-    borderWidth:      1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 99,
+    borderWidth: 1,
     paddingHorizontal: 6,
-    paddingVertical:   2,
+    paddingVertical: 2,
   },
-  text: {
-    fontSize:   9,
-    fontWeight: '700',
-  },
+  text: { fontSize: 9, fontWeight: '700' },
 })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Position medal
-// ─────────────────────────────────────────────────────────────────────────────
 
 function PositionMedal({ position }: { position: number }) {
-  if (position === 1) return <Ionicons name="trophy"     size={18} color="#d97706" />
-  if (position === 2) return <Ionicons name="medal"      size={18} color="#64748b" />
-  if (position === 3) return <Ionicons name="medal"      size={18} color="#c2410c" />
-  return (
-    <Text style={[medalStyles.number, { color: POSITION_COLORS[3] }]}>
-      {position}
-    </Text>
-  )
+  if (position === 1) return <Ionicons name="trophy" size={18} color={POSITION_COLORS[0]} />
+  if (position === 2) return <Ionicons name="medal" size={18} color={POSITION_COLORS[1]} />
+  if (position === 3) return <Ionicons name="medal" size={18} color={POSITION_COLORS[2]} />
+  return <Text style={medal.number}>{position}</Text>
 }
 
-const medalStyles = StyleSheet.create({
-  number: {
-    fontSize:  14,
-    fontWeight:'700',
-    width:     20,
-    textAlign: 'center',
-  },
+const medal = StyleSheet.create({
+  number: { fontSize: 14, fontWeight: '700', width: 20, textAlign: 'center', color: POSITION_COLORS[3] },
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section header
+// Main Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon, title, sub }: {
-  icon:  keyof typeof Ionicons.glyphMap
-  title: string
-  sub:   string
-}) {
-  return (
-    <View style={secStyles.row}>
-      <Ionicons name={icon} size={18} color="#0a7ea4" />
-      <View>
-        <Text style={secStyles.title}>{title}</Text>
-        <Text style={secStyles.sub}>{sub}</Text>
-      </View>
-    </View>
-  )
-}
-
-const secStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           8,
-    marginBottom:  12,
-  },
-  title: {
-    fontSize:   15,
-    fontWeight: '700',
-    color:      '#0f172a',
-    lineHeight: 18,
-  },
-  sub: {
-    fontSize:  11,
-    color:     '#94a3b8',
-    marginTop: 1,
-  },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pulse screen
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function PulseScreen() {
+export default function ChallengesScreen() {
   const { user, isLoading: authLoading } = useAuth()
-
-  const [streakEntries, setStreakEntries] = useState<StreakEntry[]>([])
-  const [stepsLeaders,  setStepsLeaders]  = useState<StepsEntry[]>([])
-  const [isLoading,     setIsLoading]     = useState(true)
-  const [isRefreshing,  setIsRefreshing]  = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  const [activeChallengeTab, setActiveChallengeTab] = useState<ChallengeTab>('daily')
+  const [activeLeaderboardTab, setActiveLeaderboardTab] = useState<LeaderboardTab>('individual')
 
   const loadData = async (refresh = false) => {
-    if (!user?.org_id) return
     if (refresh) setIsRefreshing(true)
-    else         setIsLoading(true)
-
-    try {
-      // ── Habit streak leaderboard ──────────────────────────────────────────
-      const { data: streaks } = await supabase
-        .from('habit_streaks')
-        .select('id, metric_type, current_streak, longest_streak, users(full_name, department, wellness_rank)')
-        .eq('org_id', user.org_id)
-        .gt('current_streak', 0)
-        .order('current_streak', { ascending: false })
-        .limit(10)
-
-      setStreakEntries((streaks as StreakEntry[] | null) ?? [])
-
-      // ── Steps leaderboard (last 30 days) ──────────────────────────────────
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      const fromDate = thirtyDaysAgo.toISOString().split('T')[0]
-
-      const { data: metrics } = await supabase
-        .from('health_metrics')
-        .select('user_id, steps, exercise_minutes, sleep_hours')
-        .eq('org_id', user.org_id)
-        .gte('metric_date', fromDate)
-
-      if (metrics && metrics.length > 0) {
-        const userMap = new Map<string, {
-          steps: number; exercise: number; sleep: number[]; days: number
-        }>()
-
-        metrics.forEach((m: {
-          user_id: string; steps: number; exercise_minutes: number; sleep_hours: number
-        }) => {
-          const e = userMap.get(m.user_id) ?? { steps: 0, exercise: 0, sleep: [], days: 0 }
-          e.steps    += m.steps            ?? 0
-          e.exercise += m.exercise_minutes ?? 0
-          if (m.sleep_hours) e.sleep.push(m.sleep_hours)
-          e.days += 1
-          userMap.set(m.user_id, e)
-        })
-
-        const userIds = Array.from(userMap.keys())
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, full_name')
-          .in('id', userIds)
-
-        const nameMap = new Map(
-          (users ?? []).map((u: { id: string; full_name: string }) => [u.id, u.full_name])
-        )
-
-        const entries: StepsEntry[] = Array.from(userMap.entries()).map(([uid, d]) => ({
-          user_id:                uid,
-          full_name:              (nameMap.get(uid) as string) ?? 'Anonymous',
-          total_steps:            d.steps,
-          total_exercise_minutes: d.exercise,
-          avg_sleep_hours:        d.sleep.length
-            ? parseFloat((d.sleep.reduce((a, b) => a + b, 0) / d.sleep.length).toFixed(1))
-            : 0,
-          days_logged: d.days,
-        }))
-
-        entries.sort((a, b) => b.total_steps - a.total_steps)
-        setStepsLeaders(entries.slice(0, 20))
-      }
-    } finally {
+    else setIsLoading(true)
+    
+    // Simulate network delay
+    setTimeout(() => {
       setIsLoading(false)
       setIsRefreshing(false)
-    }
+    }, 500)
   }
 
   useEffect(() => {
     if (!authLoading) loadData()
-  }, [authLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading])
 
-  // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading || isLoading) {
     return (
-      <SafeAreaView style={styles.centerFill}>
-        <ActivityIndicator size="large" color="#0a7ea4" />
+      <SafeAreaView style={s.centerFill}>
+        <ActivityIndicator size="large" color={COLORS.teal} />
       </SafeAreaView>
     )
   }
 
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.centerFill}>
-        <Ionicons name="lock-closed-outline" size={40} color="#94a3b8" />
-        <Text style={styles.authGateText}>Please sign in to view Team Pulse.</Text>
-      </SafeAreaView>
-    )
-  }
-
-  // ── Computed summary stats ────────────────────────────────────────────────
-  const totalDays    = streakEntries.reduce((s, e) => s + e.current_streak, 0)
-  const uniqueHabits = new Set(streakEntries.map((e) => e.metric_type)).size
-  const longestAny   = streakEntries.reduce((m, e) => Math.max(m, e.longest_streak), 0)
-
-  const myRank    = stepsLeaders.findIndex((l) => l.user_id === user.id) + 1
-  const myEntry   = stepsLeaders.find((l) => l.user_id === user.id)
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  // Build a single data array for FlatList using type-tagged items so we can
-  // render headers, stat cards, streak rows, and steps rows all in one list.
-  type ListItem =
-    | { _type: 'streakHeader' }
-    | { _type: 'statCards' }
-    | { _type: 'streak';      entry: StreakEntry; position: number }
-    | { _type: 'streakEmpty' }
-    | { _type: 'stepsHeader' }
-    | { _type: 'myStepsCard' }
-    | { _type: 'steps';       entry: StepsEntry;  position: number }
-    | { _type: 'stepsEmpty' }
-    | { _type: 'footer' }
-
-  const listData: ListItem[] = [
-    { _type: 'streakHeader' },
-    ...(streakEntries.length > 0 ? [{ _type: 'statCards' } as ListItem] : []),
-    ...(streakEntries.length > 0
-      ? streakEntries.map((entry, i) => ({ _type: 'streak', entry, position: i + 1 } as ListItem))
-      : [{ _type: 'streakEmpty' } as ListItem]),
-    { _type: 'stepsHeader' },
-    ...(myEntry ? [{ _type: 'myStepsCard' } as ListItem] : []),
-    ...(stepsLeaders.length > 0
-      ? stepsLeaders.map((entry, i) => ({ _type: 'steps', entry, position: i + 1 } as ListItem))
-      : [{ _type: 'stepsEmpty' } as ListItem]),
-    { _type: 'footer' },
-  ]
-
-  const renderItem = ({ item }: { item: ListItem }) => {
-    switch (item._type) {
-      case 'streakHeader':
-        return (
-          <View style={styles.sectionBlock}>
-            <SectionHeader
-              icon="trending-up-outline"
-              title="Top Habit Streaks"
-              sub="Active streak leaders in your organisation"
-            />
-          </View>
-        )
-
-      case 'statCards':
-        return (
-          <View style={styles.statsRow}>
-            <StatCard label="Combined streak days" value={totalDays}         sub="across all habits"  />
-            <StatCard label="Active habit types"   value={uniqueHabits}      sub="tracked by team"    />
-            <StatCard label="Longest record"        value={`${longestAny}d`} sub="best streak ever"   />
-          </View>
-        )
-
-      case 'streak': {
-        const { entry, position } = item
-        const metric   = METRIC[entry.metric_type] ?? { label: entry.metric_type, icon: 'pulse-outline' as keyof typeof Ionicons.glyphMap, textColor: '#94a3b8' }
-        const rankKey  = (entry.users?.wellness_rank ?? 'beginner') as RankKey
-        return (
-          <View style={[styles.leaderRow, position <= 3 && styles.leaderRowTop]}>
-            <View style={styles.position}>
-              <PositionMedal position={position} />
-            </View>
-
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>
-                {(entry.users?.full_name ?? '?')[0].toUpperCase()}
-              </Text>
-            </View>
-
-            <View style={styles.leaderMeta}>
-              <View style={styles.leaderNameRow}>
-                <Text style={styles.leaderName} numberOfLines={1}>
-                  {entry.users?.full_name ?? 'Team Member'}
-                </Text>
-                <RankChip rank={rankKey} />
-              </View>
-              {entry.users?.department ? (
-                <Text style={styles.leaderDept} numberOfLines={1}>
-                  {entry.users.department}
-                </Text>
-              ) : null}
-            </View>
-
-            <View style={styles.leaderRight}>
-              <View style={styles.metricTag}>
-                <Ionicons name={metric.icon} size={10} color={metric.textColor} />
-                <Text style={[styles.metricLabel, { color: metric.textColor }]}>
-                  {metric.label}
-                </Text>
-              </View>
-              <View style={styles.streakValue}>
-                <Ionicons name="flame" size={13} color="#f97316" />
-                <Text style={styles.streakDays}>{entry.current_streak}d</Text>
-              </View>
-            </View>
-          </View>
-        )
-      }
-
-      case 'streakEmpty':
-        return (
-          <View style={styles.emptyBlock}>
-            <Ionicons name="people-outline" size={20} color="#94a3b8" />
-            <Text style={styles.emptyText}>No active streaks yet</Text>
-            <Text style={styles.emptySubText}>
-              Log a habit today to appear on the leaderboard.
-            </Text>
-          </View>
-        )
-
-      case 'stepsHeader':
-        return (
-          <View style={[styles.sectionBlock, { marginTop: 24 }]}>
-            <SectionHeader
-              icon="footsteps-outline"
-              title="Top Performers by Steps"
-              sub="Ranked by total steps — last 30 days"
-            />
-          </View>
-        )
-
-      case 'myStepsCard':
-        if (!myEntry) return null
-        return (
-          <View style={styles.myCard}>
-            <View style={styles.myCardLeft}>
-              <PositionMedal position={myRank} />
-              <View style={styles.myAvatar}>
-                <Text style={styles.myAvatarText}>
-                  {myEntry.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
-                </Text>
-              </View>
-              <View>
-                <Text style={styles.myName}>{myEntry.full_name} (You)</Text>
-                <Text style={styles.myMeta}>
-                  Rank #{myRank} · {myEntry.days_logged} days logged
-                </Text>
-              </View>
-            </View>
-            <View style={styles.myRight}>
-              <Text style={styles.mySteps}>{myEntry.total_steps.toLocaleString()}</Text>
-              <Text style={styles.myStepsSub}>total steps</Text>
-            </View>
-          </View>
-        )
-
-      case 'steps': {
-        const { entry: se, position: sp } = item
-        const isMe = se.user_id === user.id
-        return (
-          <View style={[styles.leaderRow, isMe && styles.leaderRowMe]}>
-            <View style={styles.position}>
-              <PositionMedal position={sp} />
-            </View>
-
-            <View style={[styles.avatarCircle, isMe && styles.avatarCircleMe]}>
-              <Text style={[styles.avatarInitial, isMe && { color: '#fff' }]}>
-                {se.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
-              </Text>
-            </View>
-
-            <View style={styles.leaderMeta}>
-              <Text style={styles.leaderName} numberOfLines={1}>
-                {se.full_name}{isMe ? ' (You)' : ''}
-              </Text>
-              <Text style={styles.leaderDept} numberOfLines={1}>
-                {se.total_exercise_minutes} min exercise · {se.avg_sleep_hours}h sleep · {se.days_logged} days
-              </Text>
-            </View>
-
-            <View style={styles.leaderRight}>
-              <Text style={styles.streakDays}>{se.total_steps.toLocaleString()}</Text>
-              <Text style={styles.metricLabel}>steps</Text>
-            </View>
-          </View>
-        )
-      }
-
-      case 'stepsEmpty':
-        return (
-          <View style={styles.emptyBlock}>
-            <Ionicons name="footsteps-outline" size={20} color="#94a3b8" />
-            <Text style={styles.emptyText}>No activity data yet</Text>
-            <Text style={styles.emptySubText}>
-              Start logging your metrics to appear here.
-            </Text>
-          </View>
-        )
-
-      case 'footer':
-        if (streakEntries.length === 0) return null
-        return (
-          <View style={styles.footerCard}>
-            <Text style={styles.footerTitle}>
-              {totalDays} combined streak days across the team.
-            </Text>
-            <Text style={styles.footerSub}>
-              Log daily to climb the leaderboard and build your authority rank.
-            </Text>
-          </View>
-        )
-
-      default:
-        return null
-    }
-  }
-
-  // Demo podium for top 3 (replaces with real data if available)
-  const podium = stepsLeaders.length >= 3
-    ? [stepsLeaders[1], stepsLeaders[0], stepsLeaders[2]]  // 2nd, 1st, 3rd
-    : [
-        { full_name: 'Ana Reyes',          total_steps: 1720, user_id: 'a' },
-        { full_name: 'Maria Santos',       total_steps: 1840, user_id: 'b' },
-        { full_name: 'Carlo Dela Cruz',    total_steps: 1580, user_id: 'c' },
-      ]
+  const currentChallenges = MOCK_CHALLENGES[activeChallengeTab]
 
   return (
-    <SafeAreaView style={styles.root}>
-      <FlatList<ListItem>
-        data={listData}
-        keyExtractor={(item, index) => `${item._type}-${index}`}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => loadData(true)}
-            tintColor="#3FE870"
-          />
-        }
-        ListHeaderComponent={(
-          <View style={styles.pulseHeader}>
-            {/* Title + rank */}
-            <View style={styles.pulseTitleRow}>
-              <View>
-                <Text style={styles.pulseTitle}>Team Pulse ⚡</Text>
-                <Text style={styles.pulseSub}>March 2026 Leaderboard · BDO Unibank</Text>
+    <SafeAreaView style={s.root} edges={['top', 'left', 'right']}>
+      
+      {/* ── 1. Navy Header ── */}
+      <View style={s.headerBg}>
+        <Text style={s.headerSubtitle}>Compete & Win</Text>
+        <Text style={s.headerTitle}>Challenges</Text>
+        
+        <View style={s.tabRow}>
+          {(['daily', 'weekly', 'team'] as ChallengeTab[]).map((tab) => {
+            const isActive = activeChallengeTab === tab
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveChallengeTab(tab)}
+                style={[s.tabPill, isActive && s.tabPillActive]}
+              >
+                <Text style={[s.tabText, isActive && s.tabTextActive]}>
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      </View>
+
+      {/* ── 2. Scrollable Body ── */}
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        style={s.scrollBody}
+        contentContainerStyle={s.scrollContent}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadData(true)} tintColor={COLORS.teal} />}
+      >
+        
+        {/* ── Challenges List ── */}
+        <View style={s.challengesList}>
+          {currentChallenges.map((item) => (
+            <View key={item.id} style={s.card}>
+              <View style={s.cardTopRow}>
+                <View style={[s.cardIconBox, { backgroundColor: item.iconBg }]}>
+                  <Text style={s.cardIconText}>{item.icon}</Text>
+                </View>
+                <View style={s.cardTextContent}>
+                  <Text style={s.cardTitle}>{item.title}</Text>
+                  <Text style={s.cardSubtitle}>{item.sub}</Text>
+                  <View style={s.cardMetaRow}>
+                    <View style={s.categoryTag}>
+                      <Text style={s.categoryText}>{item.category}</Text>
+                    </View>
+                    <Text style={s.timeLeftText}>·  {item.time}</Text>
+                  </View>
+                </View>
+                <View style={s.pointsBadge}>
+                  <Text style={s.pointsText}>+{item.points}</Text>
+                </View>
               </View>
-              <View style={styles.myRankBadge}>
-                <Text style={styles.myRankText}>Rank #{myRank || 4}</Text>
+
+              <View style={s.cardBottomRow}>
+                {item.joined ? (
+                  <View style={s.progressContainer}>
+                    <ProgressBar progress={item.progress} />
+                    <View style={s.progressLabels}>
+                      <Text style={s.progressText}>{item.progress}% complete</Text>
+                      <Text style={s.activeText}>Active ✓</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable style={s.joinBtn}>
+                    <Text style={s.joinBtnText}>Join Challenge</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
+          ))}
+        </View>
 
-            {/* Podium */}
-            <View style={styles.podium}>
-              {/* 2nd place */}
-              <View style={styles.podiumPerson}>
-                <View style={[styles.podiumAvatar, { borderColor: '#94a3b8' }]}>
-                  <Text style={styles.podiumAvatarText}>{podium[0].full_name?.charAt(0)}</Text>
-                </View>
-                <Text style={styles.podiumName} numberOfLines={1}>
-                  {podium[0].full_name?.split(' ')[0]}
+        {/* ── Leaderboard Section (Old Design Restored) ── */}
+        <View style={s.leaderboardHeader}>
+          <Text style={s.leaderboardTitle}>Leaderboard</Text>
+          <Pressable>
+            <Text style={s.companyLink}>Company →</Text>
+          </Pressable>
+        </View>
+
+        <View style={s.lbTabRow}>
+          {(['individual', 'department', 'company'] as LeaderboardTab[]).map((tab) => {
+            const isActive = activeLeaderboardTab === tab
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveLeaderboardTab(tab)}
+                style={[s.lbTabPill, isActive && s.lbTabPillActive]}
+              >
+                <Text style={[s.lbTabText, isActive && s.lbTabTextActive]}>
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </Text>
-                <View style={[styles.podiumBox, { backgroundColor: '#94a3b833', height: 60 }]}>
-                  <Text style={styles.podiumPts}>{podium[0].total_steps?.toLocaleString()}</Text>
-                  <Text style={styles.podiumMedal}>🥈</Text>
-                </View>
+              </Pressable>
+            )
+          })}
+        </View>
+
+        {/* Leaderboard Rows */}
+        <View style={s.leaderboardList}>
+          {MOCK_LEADERBOARD.map((user) => (
+            <View key={user.id} style={[s.leaderRow, user.rank <= 3 && s.leaderRowTop]}>
+              <View style={s.position}>
+                <PositionMedal position={user.rank} />
               </View>
 
-              {/* 1st place */}
-              <View style={[styles.podiumPerson, { marginBottom: 0 }]}>
-                <View style={[styles.podiumAvatar, styles.podiumAvatarFirst, { borderColor: '#f59e0b' }]}>
-                  <Text style={styles.podiumAvatarText}>{podium[1].full_name?.charAt(0)}</Text>
-                </View>
-                <Text style={[styles.podiumName, { fontWeight: '900' }]} numberOfLines={1}>
-                  {podium[1].full_name?.split(' ')[0]}
-                </Text>
-                <View style={[styles.podiumBox, { backgroundColor: '#f59e0b33', height: 80 }]}>
-                  <Text style={[styles.podiumPts, { color: '#f59e0b' }]}>{podium[1].total_steps?.toLocaleString()}</Text>
-                  <Text style={styles.podiumMedal}>🥇</Text>
-                </View>
+              <View style={s.avatarCircle}>
+                <Text style={s.avatarInitial}>{user.name.charAt(0)}</Text>
               </View>
 
-              {/* 3rd place */}
-              <View style={styles.podiumPerson}>
-                <View style={[styles.podiumAvatar, { borderColor: '#c2410c' }]}>
-                  <Text style={styles.podiumAvatarText}>{podium[2].full_name?.charAt(0)}</Text>
+              <View style={s.leaderMeta}>
+                <View style={s.leaderNameRow}>
+                  <Text style={s.leaderName} numberOfLines={1}>{user.name}</Text>
+                  <RankChip rank={user.rankKey} />
                 </View>
-                <Text style={styles.podiumName} numberOfLines={1}>
-                  {podium[2].full_name?.split(' ')[0]}
-                </Text>
-                <View style={[styles.podiumBox, { backgroundColor: '#c2410c33', height: 44 }]}>
-                  <Text style={styles.podiumPts}>{podium[2].total_steps?.toLocaleString()}</Text>
-                  <Text style={styles.podiumMedal}>🥉</Text>
+                <Text style={s.leaderDept}>{user.dept}</Text>
+              </View>
+
+              <View style={s.leaderRight}>
+                <View style={s.streakValue}>
+                  <Ionicons name="star" size={13} color={COLORS.orangeDark} />
+                  <Text style={s.streakDays}>{user.points.toLocaleString()}</Text>
                 </View>
+                <Text style={s.metricLabel}>points</Text>
               </View>
             </View>
+          ))}
 
-            {/* Stat strip */}
-            <View style={styles.pulseStatStrip}>
-              <View style={styles.pulseStatItem}>
-                <Text style={styles.pulseStatEmoji}>📊</Text>
-                <View>
-                  <Text style={styles.pulseStatValue}>1,280</Text>
-                  <Text style={styles.pulseStatLabel}>Company Avg Score</Text>
-                </View>
-              </View>
-              <View style={styles.pulseStatDivider} />
-              <View style={styles.pulseStatItem}>
-                <Text style={styles.pulseStatEmoji}>👟</Text>
-                <View>
-                  <Text style={styles.pulseStatValue}>2.4M</Text>
-                  <Text style={styles.pulseStatLabel}>Total Steps This Week</Text>
-                </View>
-              </View>
+          <Text style={s.lbDots}>...</Text>
+
+          {/* Current User Row */}
+          <View style={[s.leaderRow, s.leaderRowMe]}>
+            <View style={s.position}>
+              <Text style={[medal.number, { color: COLORS.teal }]}>#{MOCK_ME.rank}</Text>
             </View>
 
-            <Text style={styles.rankingsLabel}>FULL RANKINGS · THIS MONTH</Text>
+            <View style={s.avatarCircleMe}>
+              <Text style={s.avatarInitialMe}>{MOCK_ME.name.charAt(0)}</Text>
+            </View>
+
+            <View style={s.leaderMeta}>
+              <View style={s.leaderNameRow}>
+                <Text style={s.leaderName} numberOfLines={1}>{MOCK_ME.name}</Text>
+                <RankChip rank={MOCK_ME.rankKey} />
+              </View>
+              <Text style={s.leaderDept}>{MOCK_ME.dept}</Text>
+            </View>
+
+            <View style={s.leaderRight}>
+              <View style={s.streakValue}>
+                <Ionicons name="star" size={13} color={COLORS.orangeDark} />
+                <Text style={s.streakDays}>{MOCK_ME.points.toLocaleString()}</Text>
+              </View>
+              <Text style={s.metricLabel}>points</Text>
+            </View>
           </View>
-        )}
-      />
+        </View>
+
+      </ScrollView>
     </SafeAreaView>
   )
 }
@@ -666,350 +357,125 @@ export default function PulseScreen() {
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: {
-    flex:            1,
-    backgroundColor: '#f8fafc',
-  },
-  centerFill: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            12,
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: COLORS.navy },
+  centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Pulse header
-  pulseHeader: {
-    backgroundColor:   '#260A2F',
-    paddingHorizontal: 18,
-    paddingTop:        Platform.OS === 'ios' ? 16 : 20,
-    paddingBottom:     20,
-    gap:               16,
+  // Header
+  headerBg: {
+    backgroundColor: COLORS.navy,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
-  pulseTitleRow: {
-    flexDirection:  'row',
-    alignItems:     'flex-start',
-    justifyContent: 'space-between',
-  },
-  pulseTitle: { fontSize: 22, fontWeight: '900', color: '#ffffff' },
-  pulseSub:   { fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3 },
-  myRankBadge: {
-    backgroundColor:   'rgba(255,107,0,0.25)',
-    borderRadius:      99,
-    paddingHorizontal: 12,
-    paddingVertical:   6,
-    borderWidth:       1,
-    borderColor:       '#FF6B0055',
-  },
-  myRankText: { fontSize: 12, fontWeight: '800', color: '#FF6B00' },
+  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginBottom: 4 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: COLORS.white, marginBottom: 16 },
+  tabRow: { flexDirection: 'row', gap: 10 },
+  tabPill: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
+  tabPillActive: { backgroundColor: COLORS.white },
+  tabText: { color: COLORS.white, fontWeight: '600', fontSize: 14 },
+  tabTextActive: { color: COLORS.navy, fontWeight: '800' },
 
-  // Podium
-  podium: {
-    flexDirection:  'row',
-    alignItems:     'flex-end',
-    justifyContent: 'center',
-    gap:            12,
-  },
-  podiumPerson: {
-    alignItems:  'center',
-    gap:         4,
-    width:       90,
-    marginBottom: 0,
-  },
-  podiumAvatar: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
-    borderWidth:     2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  podiumAvatarFirst: {
-    width:  60,
-    height: 60,
-    borderRadius: 30,
-  },
-  podiumAvatarText: { fontSize: 20, fontWeight: '900', color: '#ffffff' },
-  podiumName: {
-    fontSize:   11,
-    fontWeight: '700',
-    color:      'rgba(255,255,255,0.7)',
-    textAlign:  'center',
-  },
-  podiumBox: {
-    width:          '100%',
-    borderRadius:   10,
-    alignItems:     'center',
-    justifyContent: 'flex-end',
-    paddingBottom:  8,
-    gap:            2,
-  },
-  podiumPts:   { fontSize: 13, fontWeight: '900', color: '#ffffff' },
-  podiumMedal: { fontSize: 18 },
+  // Body
+  scrollBody: { backgroundColor: COLORS.white },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
 
-  // Stat strip
-  pulseStatStrip: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   'rgba(255,255,255,0.08)',
-    borderRadius:      14,
-    padding:           14,
+  // Challenge Cards
+  challengesList: { gap: 16 },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.lightTeal,
+    padding: 16,
+    ...Platform.select({
+      ios: { shadowColor: COLORS.teal, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 2 },
+    }),
   },
-  pulseStatItem: {
-    flex:          1,
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           10,
-  },
-  pulseStatEmoji: { fontSize: 22 },
-  pulseStatValue: { fontSize: 17, fontWeight: '900', color: '#ffffff' },
-  pulseStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1 },
-  pulseStatDivider: {
-    width:           1,
-    height:          32,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginHorizontal: 8,
-  },
+  cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
+  cardIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  cardIconText: { fontSize: 22 },
+  cardTextContent: { flex: 1 },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: COLORS.navy, marginBottom: 2 },
+  cardSubtitle: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 },
+  cardMetaRow: { flexDirection: 'row', alignItems: 'center' },
+  categoryTag: { backgroundColor: COLORS.lightTeal, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  categoryText: { color: COLORS.teal, fontSize: 10, fontWeight: '700' },
+  timeLeftText: { fontSize: 11, color: COLORS.disabledText, marginLeft: 6 },
+  pointsBadge: { backgroundColor: '#FFF8E1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, marginLeft: 10 },
+  pointsText: { color: COLORS.orangeDark, fontWeight: '800', fontSize: 12 },
 
-  rankingsLabel: {
-    fontSize:      10,
-    fontWeight:    '800',
-    color:         'rgba(255,255,255,0.35)',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  authGateText: {
-    fontSize:  14,
-    color:     '#94a3b8',
-    textAlign: 'center',
-  },
-  listContent: {
-    paddingBottom: 40,
-  },
+  // Card Bottom
+  cardBottomRow: { marginTop: 4 },
+  progressContainer: { width: '100%' },
+  progressTrack: { height: 6, backgroundColor: COLORS.border, borderRadius: 3, marginBottom: 8, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: COLORS.green, borderRadius: 3 },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
+  activeText: { fontSize: 11, color: COLORS.teal, fontWeight: '700' },
+  joinBtn: { backgroundColor: COLORS.teal, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  joinBtnText: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
 
-  sectionBlock: {
-    paddingHorizontal: 16,
-    paddingTop:        20,
-    paddingBottom:     0,
-  },
+  // Leaderboard Header & Tabs
+  leaderboardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 32, marginBottom: 16 },
+  leaderboardTitle: { fontSize: 18, fontWeight: '800', color: COLORS.navy },
+  companyLink: { fontSize: 13, fontWeight: '700', color: COLORS.teal },
+  lbTabRow: { flexDirection: 'row', gap: 8, marginBottom: 8 }, // reduced margin to pull cards up
+  lbTabPill: { backgroundColor: COLORS.bgGray, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  lbTabPillActive: { backgroundColor: COLORS.teal },
+  lbTabText: { color: COLORS.textSecondary, fontWeight: '600', fontSize: 12 },
+  lbTabTextActive: { color: COLORS.white, fontWeight: '800' },
 
-  statsRow: {
-    flexDirection:    'row',
-    gap:              10,
-    paddingHorizontal: 16,
-    paddingTop:       12,
-    paddingBottom:    4,
+  // Leaderboard List (Old Design Restored)
+  leaderboardList: {
+    paddingBottom: 10,
   },
-
-  // Leaderboard rows
   leaderRow: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    gap:              12,
-    backgroundColor:  '#ffffff',
-    borderWidth:      1,
-    borderColor:      '#f1f5f9',
-    borderRadius:     14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical:  12,
-    marginHorizontal: 16,
-    marginTop:        8,
+    paddingVertical: 12,
+    marginTop: 8, // spaces out the individual cards
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 2 },
       android: { elevation: 1 },
     }),
   },
   leaderRowTop: {
-    borderColor: '#e2e8f0',
+    borderColor: COLORS.border,
     ...Platform.select({
       ios: { shadowOpacity: 0.07, shadowRadius: 4 },
       android: { elevation: 2 },
     }),
   },
   leaderRowMe: {
-    borderColor:     '#bfdbfe',
-    backgroundColor: '#eff6ff',
+    borderColor: COLORS.teal,
+    backgroundColor: COLORS.lightTeal,
   },
 
-  position: {
-    width:          24,
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
+  position: { width: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  
+  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.bgGray, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  avatarInitial: { fontSize: 13, fontWeight: '700', color: COLORS.navy },
+  
+  avatarCircleMe: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.teal, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  avatarInitialMe: { fontSize: 13, fontWeight: '700', color: COLORS.white },
 
-  avatarCircle: {
-    width:          36,
-    height:         36,
-    borderRadius:   18,
-    backgroundColor: '#dbeafe',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  avatarCircleMe: {
-    backgroundColor: '#0a7ea4',
-  },
-  avatarInitial: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#0a7ea4',
-  },
+  leaderMeta: { flex: 1, minWidth: 0, gap: 3 },
+  leaderNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  leaderName: { fontSize: 14, fontWeight: '600', color: COLORS.textPrimary, flexShrink: 1 },
+  leaderDept: { fontSize: 11, color: COLORS.textSecondary, lineHeight: 14 },
 
-  leaderMeta: {
-    flex:     1,
-    minWidth: 0,
-    gap:      3,
-  },
-  leaderNameRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    flexWrap:      'wrap',
-    gap:           6,
-  },
-  leaderName: {
-    fontSize:   14,
-    fontWeight: '600',
-    color:      '#0f172a',
-    flexShrink: 1,
-  },
-  leaderDept: {
-    fontSize:  11,
-    color:     '#94a3b8',
-    lineHeight: 14,
-  },
+  leaderRight: { alignItems: 'flex-end', gap: 2, flexShrink: 0 },
+  streakValue: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  streakDays: { fontSize: 14, fontWeight: '900', color: COLORS.textPrimary },
+  metricLabel: { fontSize: 10, fontWeight: '600', color: COLORS.disabledText },
 
-  leaderRight: {
-    alignItems: 'flex-end',
-    gap:        4,
-    flexShrink: 0,
-  },
-  metricTag: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           3,
-  },
-  metricLabel: {
-    fontSize:   10,
-    fontWeight: '600',
-    color:      '#94a3b8',
-  },
-  streakValue: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           3,
-  },
-  streakDays: {
-    fontSize:   14,
-    fontWeight: '900',
-    color:      '#0f172a',
-  },
-
-  // My steps highlight card
-  myCard: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    justifyContent:   'space-between',
-    backgroundColor:  '#eff6ff',
-    borderWidth:      1,
-    borderColor:      '#bfdbfe',
-    borderRadius:     14,
-    paddingHorizontal: 14,
-    paddingVertical:  12,
-    marginHorizontal: 16,
-    marginTop:        12,
-  },
-  myCardLeft: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           10,
-    flex:          1,
-    minWidth:      0,
-  },
-  myAvatar: {
-    width:          40,
-    height:         40,
-    borderRadius:   20,
-    backgroundColor: '#0a7ea4',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  myAvatarText: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#ffffff',
-  },
-  myName: {
-    fontSize:   14,
-    fontWeight: '700',
-    color:      '#0f172a',
-  },
-  myMeta: {
-    fontSize: 11,
-    color:    '#64748b',
-    marginTop: 1,
-  },
-  myRight: {
-    alignItems: 'flex-end',
-    flexShrink: 0,
-  },
-  mySteps: {
-    fontSize:   20,
-    fontWeight: '900',
-    color:      '#0f172a',
-  },
-  myStepsSub: {
-    fontSize:  11,
-    color:     '#64748b',
-  },
-
-  // Empty states
-  emptyBlock: {
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderRadius:    12,
-    borderWidth:     1,
-    borderColor:     '#e2e8f0',
-    borderStyle:     'dashed',
-    backgroundColor: '#f8fafc',
-    paddingVertical: 40,
-    marginHorizontal: 16,
-    marginTop:       8,
-    gap:             6,
-  },
-  emptyText: {
-    fontSize:   13,
-    fontWeight: '600',
-    color:      '#64748b',
-  },
-  emptySubText: {
-    fontSize:  11,
-    color:     '#94a3b8',
-    textAlign: 'center',
-    maxWidth:  220,
-  },
-
-  // Footer motivation card
-  footerCard: {
-    borderRadius:    12,
-    borderWidth:     1,
-    borderColor:     '#e2e8f0',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginHorizontal: 16,
-    marginTop:       16,
-  },
-  footerTitle: {
-    fontSize:   14,
-    fontWeight: '700',
-    color:      '#0f172a',
-  },
-  footerSub: {
-    fontSize:  12,
-    color:     '#94a3b8',
-    marginTop: 3,
-  },
+  lbDots: { textAlign: 'center', color: COLORS.disabledText, fontSize: 16, fontWeight: '800', letterSpacing: 2, marginTop: 12, marginBottom: 4 },
 })

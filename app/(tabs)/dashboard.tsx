@@ -1,18 +1,21 @@
 /**
  * Dashboard — Home tab
  *
- * - Greeting + date + avatar
- * - Wellness Score circular card
- * - TODAY'S METRICS: 2×2 grid (Wellness Score, Steps, Active Mins, Calories)
- * - DAILY HABITS: 3×2 grid of habit tiles
- * - March Step Challenge card
- * - Daily Promo Hour card (links to Promo tab)
+ * Features:
+ * - Premium Soft-UI Design
+ * - Header Rank Badge (Beginner/Veteran/Pro)
+ * - Interactive Water Tracker (+ / - buttons)
+ * - Advanced Activity Tracker (Walk/Run/Bike/Meditate)
+ * - Countdown, Pause, Resume, and Finish features
  */
 
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
+import { Pedometer } from 'expo-sensors'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -32,6 +35,32 @@ import { supabase } from '@/lib/supabase'
 const { width } = Dimensions.get('window')
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Brand Colors & Theme
+// ─────────────────────────────────────────────────────────────────────────────
+const COLORS = {
+  navy: '#1E2356',     
+  teal: '#00C4C7',     
+  purple: '#6244CB',   
+  orange: '#FFB185',   
+  orangeDark: '#F59E0B',
+  green: '#4CAF7A',    
+  lightGreen: '#E8F5E9',
+  lightTeal: '#E6FDFD',
+  bgGray: '#F4F7FA',   // Slightly cooler gray for premium soft-ui background
+  white: '#FFFFFF',
+  textPrimary: '#1E2356',
+  textSecondary: '#64748B',
+  border: '#E5E7EB',
+  disabledText: '#94A3B8'
+}
+
+const RANK_UI: Record<string, { label: string, bg: string, text: string, border: string }> = {
+  beginner: { label: 'Beginner', bg: COLORS.lightGreen, text: '#15803d', border: COLORS.green },
+  veteran:  { label: 'Veteran', bg: COLORS.lightTeal, text: '#0e7490', border: COLORS.teal },
+  pro:      { label: 'Pro', bg: '#FFF8E1', text: '#b45309', border: COLORS.orangeDark },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -40,265 +69,50 @@ interface TodayMetrics {
   exercise_minutes: number
   calories:         number
   wellness_score:   number
+  water_glasses:    number
 }
+
+type ActivityType = 'walk' | 'run' | 'bike' | 'meditate'
+type TrackerState = 'idle' | 'countdown' | 'tracking' | 'paused'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function greeting(name: string | undefined): string {
-  const h    = new Date().getHours()
-  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
-  const first = name?.split(' ')[0] ?? 'Juan'
-  return `Good ${part}, ${first}!`
+function getFirstName(name: string | undefined): string {
+  return name?.split(' ')[0] ?? 'Jenzele'
 }
 
-function dayLabel(): string {
-  const now = new Date()
-  return now.toLocaleDateString('en-PH', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  }) + ' · PH'
+function formatTimer(totalSeconds: number) {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Progress bar
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = Math.min(value / max, 1)
-  return (
-    <View style={pb.track}>
-      <View style={[pb.fill, { width: `${pct * 100}%` as any, backgroundColor: color }]} />
-    </View>
-  )
-}
-const pb = StyleSheet.create({
-  track: { height: 5, borderRadius: 3, backgroundColor: '#e2e8f0', overflow: 'hidden' },
-  fill:  { height: 5, borderRadius: 3 },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Wellness Score card (circular)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function WellnessScoreCard({ score }: { score: number }) {
-  return (
-    <View style={ws.card}>
-      {/* Circle */}
-      <View style={ws.circleWrap}>
-        <View style={ws.circleOuter}>
-          <View style={ws.circleInner}>
-            <Text style={ws.scoreNum}>{score}</Text>
-            <Text style={ws.scoreDen}>/100</Text>
-          </View>
-        </View>
-      </View>
-      {/* Text */}
-      <View style={ws.textBlock}>
-        <Text style={ws.title}>Wellness Score ☀️</Text>
-        <Text style={ws.subtitle}>
-          You're in the top 15% of your company! Keep it up, Kabayan!
-        </Text>
-        <View style={ws.badge}>
-          <Ionicons name="trending-up-outline" size={12} color="#3FE870" />
-          <Text style={ws.badgeText}>+5 from last week</Text>
-        </View>
-      </View>
-    </View>
-  )
-}
-const ws = StyleSheet.create({
-  card: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   '#ffffff',
-    borderRadius:      18,
-    padding:           18,
-    gap:               16,
-    marginHorizontal:  16,
-    marginTop:         16,
-    borderWidth:       1,
-    borderColor:       '#f1f5f9',
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
-      android: { elevation: 2 },
-    }),
-  },
-  circleWrap:  { alignItems: 'center', justifyContent: 'center' },
-  circleOuter: {
-    width:           76,
-    height:          76,
-    borderRadius:    38,
-    borderWidth:     4,
-    borderColor:     '#3FE870',
-    alignItems:      'center',
-    justifyContent:  'center',
-    backgroundColor: '#f0fdf4',
-  },
-  circleInner: { alignItems: 'center' },
-  scoreNum:    { fontSize: 22, fontWeight: '900', color: '#0f172a', lineHeight: 26 },
-  scoreDen:    { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
-  textBlock:   { flex: 1, gap: 5 },
-  title:       { fontSize: 15, fontWeight: '800', color: '#0f172a' },
-  subtitle:    { fontSize: 12, color: '#64748b', lineHeight: 17 },
-  badge: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               4,
-    backgroundColor:   '#f0fdf4',
-    borderRadius:      99,
-    paddingHorizontal: 8,
-    paddingVertical:   4,
-    alignSelf:         'flex-start',
-    marginTop:         2,
-  },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#3FE870' },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Metric card (2×2 grid)
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface MetricCardProps {
-  emoji:    string
-  value:    string
-  unit:     string
-  label:    string
-  current:  number
-  max:      number
-  barColor: string
-}
-function MetricCard({ emoji, value, unit, label, current, max, barColor }: MetricCardProps) {
-  return (
-    <View style={mc.card}>
-      <View style={mc.topRow}>
-        <Text style={mc.emoji}>{emoji}</Text>
-        <Text style={mc.unit}>{unit}</Text>
-      </View>
-      <Text style={mc.value}>{value}</Text>
-      <Text style={mc.label}>{label}</Text>
-      <ProgressBar value={current} max={max} color={barColor} />
-    </View>
-  )
-}
-const mc = StyleSheet.create({
-  card: {
-    flex:            1,
-    backgroundColor: '#ffffff',
-    borderRadius:    14,
-    padding:         14,
-    gap:             5,
-    borderWidth:     1,
-    borderColor:     '#f1f5f9',
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4 },
-      android: { elevation: 1 },
-    }),
-  },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  emoji:  { fontSize: 18 },
-  unit:   { fontSize: 10, color: '#94a3b8', fontWeight: '500' },
-  value:  { fontSize: 22, fontWeight: '900', color: '#0f172a', lineHeight: 26 },
-  label:  { fontSize: 11, color: '#64748b', fontWeight: '500', marginBottom: 4 },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Daily Habit tile
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface HabitTileProps {
-  emoji:    string
-  value:    string
-  label:    string
-  done:     boolean
-}
-function HabitTile({ emoji, value, label, done }: HabitTileProps) {
-  return (
-    <View style={ht.tile}>
-      <Text style={ht.emoji}>{emoji}</Text>
-      <Text style={ht.value}>{value}</Text>
-      <Text style={ht.label}>{label}</Text>
-      {done && (
-        <View style={ht.check}>
-          <Ionicons name="checkmark-circle" size={16} color="#3FE870" />
-        </View>
-      )}
-    </View>
-  )
-}
-const ht = StyleSheet.create({
-  tile: {
-    flex:            1,
-    backgroundColor: '#1a3a1a',
-    borderRadius:    14,
-    padding:         12,
-    minHeight:       80,
-    gap:             3,
-  },
-  emoji: { fontSize: 20 },
-  value: { fontSize: 15, fontWeight: '900', color: '#ffffff', marginTop: 4 },
-  label: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '500' },
-  check: {
-    position: 'absolute',
-    bottom:   8,
-    right:    8,
-  },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Section header
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SectionHead({ title, right }: { title: string; right?: string }) {
-  return (
-    <View style={sh.row}>
-      <Text style={sh.title}>{title}</Text>
-      {right && <Text style={sh.right}>{right}</Text>}
-    </View>
-  )
-}
-const sh = StyleSheet.create({
-  row:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  title: { fontSize: 13, fontWeight: '800', color: '#94a3b8', letterSpacing: 0.8, textTransform: 'uppercase' },
-  right: { fontSize: 13, fontWeight: '700', color: '#3FE870' },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Profile Drawer
+// Profile Drawer (Updated to Seegla Brand Colors)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DRAWER_WIDTH = width * 0.8
 
-function ProfileDrawer({
-  visible,
-  onClose,
-  user,
-}: {
-  visible: boolean
-  onClose: () => void
-  user:    any
-}) {
+function ProfileDrawer({ visible, onClose, user }: { visible: boolean, onClose: () => void, user: any }) {
   const slideAnim = useRef(new Animated.Value(DRAWER_WIDTH)).current
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue:         0,
-        tension:         65,
-        friction:        11,
-        useNativeDriver: true,
-      }).start()
+      Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }).start()
     } else {
       slideAnim.setValue(DRAWER_WIDTH)
     }
   }, [visible])
 
   const handleClose = () => {
-    Animated.timing(slideAnim, {
-      toValue:         DRAWER_WIDTH,
-      duration:        220,
-      useNativeDriver: true,
-    }).start(() => onClose())
+    Animated.timing(slideAnim, { toValue: DRAWER_WIDTH, duration: 220, useNativeDriver: true }).start(() => onClose())
   }
 
   const handleLogOut = async () => {
@@ -317,68 +131,57 @@ function ProfileDrawer({
   }
 
   const MENU_ITEMS = [
-    { icon: 'person-outline'       as const, label: 'View Profile',       onPress: handleViewProfile },
-    { icon: 'settings-outline'     as const, label: 'Settings & Privacy', onPress: undefined },
-    { icon: 'newspaper-outline'    as const, label: 'Activity Log',        onPress: undefined },
-    { icon: 'help-circle-outline'  as const, label: 'Help & Support',      onPress: undefined },
+    { icon: 'person-outline' as const, label: 'View Profile', onPress: handleViewProfile },
+    { icon: 'settings-outline' as const, label: 'Settings & Privacy', onPress: undefined },
+    { icon: 'newspaper-outline' as const, label: 'Activity Log', onPress: undefined },
+    { icon: 'help-circle-outline' as const, label: 'Help & Support', onPress: undefined },
   ]
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <View style={dr.overlay}>
-        {/* Backdrop — tap to close */}
         <Pressable style={dr.backdrop} onPress={handleClose} />
-
-        {/* Sliding drawer */}
         <Animated.View style={[dr.drawer, { transform: [{ translateX: slideAnim }] }]}>
-
-          {/* ── Profile header ── */}
+          
+          {/* Profile Section */}
           <View style={dr.profileSection}>
             <View style={dr.avatarWrap}>
               <View style={dr.avatarCircle}>
                 <Text style={dr.avatarInitials}>{initials}</Text>
               </View>
               <View style={dr.editBadge}>
-                <Ionicons name="pencil" size={11} color="#ffffff" />
+                <Ionicons name="pencil" size={11} color={COLORS.white} />
               </View>
             </View>
             <Text style={dr.profileName}>{authorName}</Text>
             <Text style={dr.profileRole}>{role}</Text>
           </View>
-
+          
           <View style={dr.divider} />
-
-          {/* ── Menu items ── */}
+          
+          {/* Menu Items */}
           <ScrollView style={dr.menuScroll} showsVerticalScrollIndicator={false}>
             {MENU_ITEMS.map((item) => (
-              <Pressable
-                key={item.label}
-                onPress={item.onPress}
-                style={({ pressed }) => [dr.menuItem, pressed && { backgroundColor: '#f8fafc' }]}
+              <Pressable 
+                key={item.label} 
+                onPress={item.onPress} 
+                style={({ pressed }) => [dr.menuItem, pressed && { backgroundColor: COLORS.bgGray }]}
               >
                 <View style={dr.menuIconBox}>
-                  <Ionicons name={item.icon} size={20} color="#475569" />
+                  <Ionicons name={item.icon} size={20} color={COLORS.navy} />
                 </View>
                 <Text style={dr.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+                <Ionicons name="chevron-forward" size={16} color={COLORS.disabledText} />
               </Pressable>
             ))}
           </ScrollView>
 
-          {/* ── Log Out (bottom) ── */}
+          {/* Logout Section */}
           <View style={dr.footer}>
             <View style={dr.divider} />
-            <Pressable
-              onPress={handleLogOut}
-              style={({ pressed }) => [dr.logoutBtn, pressed && { opacity: 0.75 }]}
-            >
+            <Pressable onPress={handleLogOut} style={({ pressed }) => [dr.logoutBtn, pressed && { opacity: 0.75 }]}>
               <View style={dr.logoutIconBox}>
-                <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
               </View>
               <Text style={dr.logoutText}>Log Out</Text>
             </Pressable>
@@ -391,177 +194,139 @@ function ProfileDrawer({
 }
 
 const dr = StyleSheet.create({
-  overlay: {
-    flex:           1,
-    flexDirection:  'row',
-    backgroundColor:'transparent',
-  },
-  backdrop: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  drawer: {
-    width:           DRAWER_WIDTH,
-    backgroundColor: '#ffffff',
-    height:          '100%',
+  overlay: { flex: 1, flexDirection: 'row', backgroundColor: 'transparent' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  drawer: { 
+    width: DRAWER_WIDTH, 
+    backgroundColor: COLORS.white, 
+    height: '100%', 
+    elevation: 12,
     ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.15, shadowRadius: 16 },
-      android: { elevation: 12 },
+      ios: { shadowColor: '#000', shadowOffset: { width: -4, height: 0 }, shadowOpacity: 0.1, shadowRadius: 16 }
+    })
+  },
+  
+  // Profile Header
+  profileSection: { 
+    alignItems: 'center', 
+    paddingTop: Platform.OS === 'ios' ? 64 : 48, 
+    paddingBottom: 24, 
+    paddingHorizontal: 20, 
+    gap: 6, 
+    backgroundColor: COLORS.bgGray 
+  },
+  avatarWrap: { marginBottom: 8 },
+  avatarCircle: { 
+    width: 76, 
+    height: 76, 
+    borderRadius: 38, 
+    backgroundColor: COLORS.teal, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 3, 
+    borderColor: COLORS.white,
+    ...Platform.select({ 
+      ios: { shadowColor: COLORS.teal, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }, 
+      android: { elevation: 4 } 
     }),
   },
-
-  // Profile section
-  profileSection: {
-    alignItems:        'center',
-    paddingTop:        Platform.OS === 'ios' ? 64 : 48,
-    paddingBottom:     24,
-    paddingHorizontal: 20,
-    gap:               6,
-    backgroundColor:   '#f8fafc',
+  avatarInitials: { fontSize: 26, fontWeight: '900', color: COLORS.white },
+  editBadge: { 
+    position: 'absolute', 
+    bottom: 0, 
+    right: 0, 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12, 
+    backgroundColor: COLORS.navy, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 2, 
+    borderColor: COLORS.white 
   },
-  avatarWrap: {
-    marginBottom: 8,
-  },
-  avatarCircle: {
-    width:           76,
-    height:          76,
-    borderRadius:    38,
-    backgroundColor: '#3FE870',
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     3,
-    borderColor:     '#ffffff',
-    ...Platform.select({
-      ios:     { shadowColor: '#3FE870', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8 },
-      android: { elevation: 4 },
-    }),
-  },
-  avatarInitials: {
-    fontSize:   26,
-    fontWeight: '900',
-    color:      '#0d2210',
-  },
-  editBadge: {
-    position:        'absolute',
-    bottom:          0,
-    right:           0,
-    width:           24,
-    height:          24,
-    borderRadius:    12,
-    backgroundColor: '#1a3a1a',
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     2,
-    borderColor:     '#ffffff',
-  },
-  profileName: {
-    fontSize:   17,
-    fontWeight: '900',
-    color:      '#0f172a',
-    textAlign:  'center',
-  },
-  profileRole: {
-    fontSize:  12,
-    color:     '#94a3b8',
-    fontWeight:'600',
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: '#f1f5f9',
-  },
-
+  profileName: { fontSize: 17, fontWeight: '900', color: COLORS.navy, textAlign: 'center' },
+  profileRole: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+  
+  divider: { height: 1, backgroundColor: COLORS.border },
+  
   // Menu
-  menuScroll: {
-    flex: 1,
+  menuScroll: { flex: 1 },
+  menuItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 14, 
+    paddingHorizontal: 20, 
+    paddingVertical: 16, 
+    borderBottomWidth: 1, 
+    borderBottomColor: COLORS.border 
   },
-  menuItem: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               14,
-    paddingHorizontal: 20,
-    paddingVertical:   15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
+  menuIconBox: { 
+    width: 38, 
+    height: 38, 
+    borderRadius: 10, 
+    backgroundColor: COLORS.bgGray, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    flexShrink: 0 
   },
-  menuIconBox: {
-    width:          38,
-    height:         38,
-    borderRadius:   10,
-    backgroundColor:'#f8fafc',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
+  menuLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: COLORS.textPrimary },
+  
+  // Footer
+  footer: { paddingBottom: Platform.OS === 'ios' ? 32 : 16 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 },
+  logoutIconBox: { 
+    width: 38, 
+    height: 38, 
+    borderRadius: 10, 
+    backgroundColor: '#FEF2F2', // Very light red for danger action
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    flexShrink: 0 
   },
-  menuLabel: {
-    flex:       1,
-    fontSize:   14,
-    fontWeight: '600',
-    color:      '#334155',
-  },
-
-  // Footer / Log out
-  footer: {
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
-  },
-  logoutBtn: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               14,
-    paddingHorizontal: 20,
-    paddingVertical:   16,
-  },
-  logoutIconBox: {
-    width:          38,
-    height:         38,
-    borderRadius:   10,
-    backgroundColor:'#fef2f2',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  logoutText: {
-    fontSize:   14,
-    fontWeight: '700',
-    color:      '#ef4444',
-  },
+  logoutText: { fontSize: 14, fontWeight: '700', color: '#EF4444' }, // Red for destructive action
 })
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
   const { user } = useAuth()
-  const [metrics,      setMetrics]      = useState<TodayMetrics>({ steps: 0, exercise_minutes: 0, calories: 0, wellness_score: 0 })
+  const [metrics,      setMetrics]      = useState<TodayMetrics>({ steps: 0, exercise_minutes: 0, calories: 0, wellness_score: 0, water_glasses: 0 })
   const [totalPoints,  setTotalPoints]  = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showDrawer,   setShowDrawer]   = useState(false)
+
+  // Interactive Water State
+  const [localWater, setLocalWater] = useState(0)
+
+  // Advanced Tracker State
+  const [activityType, setActivityType] = useState<ActivityType>('walk')
+  const [trackerState, setTrackerState] = useState<TrackerState>('idle')
+  const [countdownVal, setCountdownVal] = useState(3)
+  const [trackSecs,    setTrackSecs]    = useState(0)
+  const [currentSteps, setCurrentSteps] = useState(0)
+  
+  const savedStepsRef = useRef(0)
+  const [stepSubscription, setStepSubscription] = useState<Pedometer.Subscription | null>(null)
 
   const today = new Date().toISOString().split('T')[0]
 
   const load = useCallback(async () => {
     if (!user) return
     const [metricsRes, pointsRes] = await Promise.all([
-      supabase
-        .from('health_metrics')
-        .select('steps, exercise_minutes, calories, wellness_score')
-        .eq('user_id', user.id)
-        .eq('metric_date', today)
-        .maybeSingle(),
-      supabase
-        .from('user_points')
-        .select('total_points')
-        .eq('user_id', user.id)
-        .maybeSingle(),
+      supabase.from('health_metrics').select('*').eq('user_id', user.id).eq('metric_date', today).maybeSingle(),
+      supabase.from('user_points').select('total_points').eq('user_id', user.id).maybeSingle(),
     ])
     if (metricsRes.data) {
+      const data = metricsRes.data as any
       setMetrics({
-        steps:            (metricsRes.data as any).steps            ?? 0,
-        exercise_minutes: (metricsRes.data as any).exercise_minutes ?? 0,
-        calories:         (metricsRes.data as any).calories         ?? 0,
-        wellness_score:   (metricsRes.data as any).wellness_score   ?? 87,
+        steps:            data.steps ?? 0,
+        exercise_minutes: data.exercise_minutes ?? 0,
+        calories:         data.calories ?? 0,
+        wellness_score:   data.wellness_score ?? 0,
+        water_glasses:    data.water_glasses ?? 0,
       })
+      setLocalWater(data.water_glasses ?? 0)
     }
     if (pointsRes.data) setTotalPoints((pointsRes.data as any).total_points ?? 0)
   }, [user, today])
@@ -574,241 +339,906 @@ export default function DashboardScreen() {
     setIsRefreshing(false)
   }
 
+  // Handle Interactive Water
+  const handleWaterChange = (delta: number) => {
+    setLocalWater(prev => {
+      const newVal = Math.max(0, Math.min(8, prev + delta))
+      // TODO: Optionally trigger an instant debounced Supabase update here
+      return newVal
+    })
+  }
+
+  // ── Tracker Logistics ──
+  const startPedometer = async () => {
+    if (activityType === 'walk' || activityType === 'run') {
+      const isAvailable = await Pedometer.isAvailableAsync()
+      if (isAvailable) {
+        const sub = Pedometer.watchStepCount(result => {
+          setCurrentSteps(savedStepsRef.current + result.steps)
+        })
+        setStepSubscription(sub)
+      }
+    }
+  }
+
+  const stopPedometer = () => {
+    if (stepSubscription) {
+      stepSubscription.remove()
+      setStepSubscription(null)
+      savedStepsRef.current = currentSteps 
+    }
+  }
+
+  // Handle Countdown & Timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (trackerState === 'countdown') {
+      interval = setInterval(() => {
+        setCountdownVal((prev) => {
+          if (prev <= 1) {
+            setTrackerState('tracking')
+            startPedometer()
+            return 3 
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } else if (trackerState === 'tracking') {
+      interval = setInterval(() => {
+        setTrackSecs((prev) => prev + 1)
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [trackerState])
+
+  // Tracker Controls
+  const initiateActivity = () => {
+    setCountdownVal(3)
+    setTrackerState('countdown')
+  }
+
+  const togglePause = () => {
+    if (trackerState === 'tracking') {
+      stopPedometer()
+      setTrackerState('paused')
+    } else if (trackerState === 'paused') {
+      startPedometer()
+      setTrackerState('tracking')
+    }
+  }
+
+  const finishActivity = () => {
+    stopPedometer()
+    setTrackerState('idle')
+    
+    let finalKm = 0
+    if (activityType === 'bike') finalKm = trackSecs * 0.0055
+    else finalKm = currentSteps * 0.000762
+
+    let message = `Awesome job! You tracked ${formatTimer(trackSecs)}.`
+    if (activityType !== 'meditate') {
+      message = `Awesome job! You tracked ${formatTimer(trackSecs)} and covered ${finalKm.toFixed(2)} km.`
+    }
+
+    Alert.alert('Activity Saved! 🎉', message)
+    
+    setTrackSecs(0)
+    setCurrentSteps(0)
+    savedStepsRef.current = 0
+  }
+
   if (!user) return null
 
-  // Fallback demo values
-  const steps    = metrics.steps    || 8420
+  // Demo Fallbacks
+  const steps    = metrics.steps || 7234
   const actMins  = metrics.exercise_minutes || 42
-  const calories = metrics.calories || 320
-  const wsScore  = metrics.wellness_score   || 87
-  const pts      = totalPoints || 1420
+  const calories = metrics.calories || 480
+  const pts      = totalPoints || 1240
+  const initial  = user.full_name?.charAt(0).toUpperCase() ?? 'J'
+
+  // Calculate live distance for tracker
+  let liveKm = 0
+  if (activityType === 'bike') liveKm = trackSecs * 0.0055 
+  else liveKm = currentSteps * 0.000762 
+
+  // Steps Progress
+  const stepsPercentage = Math.min(steps / 10000, 1)
+
+  // Rank Display
+  const currentRankLabel = user.wellness_rank ? user.wellness_rank.toLowerCase() : 'veteran'
+  const rankConfig = RANK_UI[currentRankLabel] || RANK_UI.beginner
 
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+      
+      {/* ── Navy Header Background ── */}
+      <View style={styles.headerBg}>
+        <View style={styles.headerContent}>
+          
+          <View style={styles.headerTopRow}>
+            <Text style={styles.greetingText}>Hello, </Text>
+            <View style={styles.headerActions}>
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakText}>🔥 5 Days</Text>
+              </View>
+              <View style={styles.iconBtn}>
+                <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
+              </View>
+              <Pressable onPress={() => setShowDrawer(true)} style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* User Name & Rank Badge */}
+          <View style={styles.nameRankRow}>
+            <Text style={styles.userName}>{getFirstName(user.full_name)}</Text>
+            <View style={[styles.headerRankChip, { backgroundColor: rankConfig.bg, borderColor: rankConfig.border }]}>
+              <Text style={[styles.headerRankText, { color: rankConfig.text }]}>{rankConfig.label}</Text>
+            </View>
+          </View>
+
+          <View style={styles.headerBottomRow}>
+            <Text style={styles.deptText}>TechCorp PH · IT Dept</Text>
+            <View style={styles.pointsWrapper}>
+              <Ionicons name="star" size={16} color={COLORS.orangeDark} />
+              <Text style={styles.pointsText}>{pts.toLocaleString()} pts</Text>
+            </View>
+          </View>
+
+        </View>
+      </View>
+
+      {/* ── Main Scroll Content ── */}
       <ScrollView
-        contentContainerStyle={s.scroll}
+        style={{ backgroundColor: COLORS.bgGray }} 
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#3FE870" />
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={COLORS.teal} />}
       >
-        {/* ── Header ── */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.dateText}>{dayLabel()}</Text>
-            <Text style={s.greeting}>{greeting(user.full_name)}</Text>
-          </View>
-          {/* Avatar — opens profile drawer */}
-          <Pressable
-            onPress={() => setShowDrawer(true)}
-            style={({ pressed }) => [s.avatar, pressed && { opacity: 0.8 }]}
-          >
-            <Text style={s.avatarText}>
-              {user.full_name?.charAt(0).toUpperCase() ?? 'J'}
-            </Text>
-          </Pressable>
-        </View>
+        <View style={styles.cardsContainer}>
 
-        {/* ── Wellness Score ── */}
-        <WellnessScoreCard score={wsScore} />
-
-        {/* ── Today's Metrics ── */}
-        <View style={s.section}>
-          <SectionHead title="Today's Metrics" />
-          <View style={s.grid}>
-            <MetricCard emoji="⭐" value={String(wsScore)} unit="/100" label="Wellness Score"
-              current={wsScore} max={100} barColor="#f59e0b" />
-            <MetricCard emoji="🏃" value={steps.toLocaleString()} unit="today" label="Steps"
-              current={steps} max={10000} barColor="#f97316" />
-          </View>
-          <View style={[s.grid, { marginTop: 10 }]}>
-            <MetricCard emoji="⚡" value={String(actMins)} unit="min" label="Active Mins"
-              current={actMins} max={60} barColor="#f97316" />
-            <MetricCard emoji="🔥" value={String(calories)} unit="kcal" label="Calories"
-              current={calories} max={500} barColor="#f97316" />
-          </View>
-        </View>
-
-        {/* ── Daily Habits ── */}
-        <View style={s.section}>
-          <SectionHead title="Daily Habits" right="4/6 done" />
-          <View style={s.habitGrid}>
-            <View style={s.habitRow}>
-              <HabitTile emoji="💧" value="6/8"   label="glasses"    done />
-              <HabitTile emoji="🏃" value="8,420" label="/10k"       done />
-              <HabitTile emoji="🔥" value="0/10"  label="mins"       done={false} />
-            </View>
-            <View style={s.habitRow}>
-              <HabitTile emoji="😴" value="7.5h"  label="last night" done />
-              <HabitTile emoji="🥗" value="2/3"   label="meals logged" done />
-              <HabitTile emoji="☕" value="3"     label="breaks taken" done />
-            </View>
-          </View>
-        </View>
-
-        {/* ── March Step Challenge ── */}
-        <Pressable
-          onPress={() => router.push('/(tabs)/rewards')}
-          style={s.challengeCard}
-        >
-          <View style={s.challengeLeft}>
-            <Text style={s.challengeEmoji}>🏆</Text>
-          </View>
-          <View style={s.challengeText}>
-            <Text style={s.challengeTitle}>March Step Challenge</Text>
-            <Text style={s.challengeSub}>250,000 / 300,000 company steps</Text>
-            <View style={s.challengeBarTrack}>
-              <View style={[s.challengeBarFill, { width: '83%' }]} />
-            </View>
-          </View>
-          <View style={s.challengePct}>
-            <Text style={s.challengePctText}>83%</Text>
-          </View>
-        </Pressable>
-
-        {/* ── Daily Promo Hour ── */}
-        <Pressable
-          onPress={() => router.push('/(tabs)/promo')}
-          style={s.promoCard}
-        >
-          <View style={s.promoLeft}>
-            <View style={s.promoIconBox}>
-              <Text style={s.promoIcon}>🔥</Text>
-            </View>
-          </View>
-          <View style={s.promoText}>
-            <View style={s.promoTitleRow}>
-              <Text style={s.promoTitle}>Daily Promo Hour</Text>
-              <View style={s.promoBadge}>
-                <Text style={s.promoBadgeText}>TONIGHT 8PM</Text>
+          {/* 1. Daily Check-in Card */}
+       {/* Compact Daily Check-in Card */}
+       <View style={styles.checkInCard}>
+            <View style={styles.checkInRow}>
+              <View style={styles.checkIconWrap}>
+                <Ionicons name="checkmark" size={18} color={COLORS.green} />
+              </View>
+              <View style={styles.checkInTextWrap}>
+                <Text style={styles.cardTitle}>Daily Check-in Complete</Text>
+                <Text style={styles.cardSub}>Feeling great today 😊</Text>
+              </View>
+              <View style={styles.ptsBadge}>
+                <Text style={styles.ptsBadgeText}>+10 pts</Text>
               </View>
             </View>
-            <Text style={s.promoSub}>Check in now → unlock exclusive deals</Text>
-            <View style={s.promoMeta}>
-              <Text style={s.promoMetaText}>⏱ Unlocks in 8h 34m</Text>
-              <Text style={[s.promoMetaText, { color: '#3FE870' }]}>  ✓ You're checked in!</Text>
+          </View>
+
+          {/* 2. Daily Promo Hour (Gradient Card) */}
+          <LinearGradient colors={[COLORS.purple, COLORS.teal]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promoGradient}>
+            <View style={styles.promoHeader}>
+              <View style={styles.promoHeaderLeft}>
+                <Text style={styles.giftIcon}>🎁</Text>
+                <Text style={styles.promoLabel}>DAILY PROMO HOUR</Text>
+              </View>
+              <View style={styles.timeBadge}>
+                <Text style={styles.timeBadgeText}>Tonight 8 PM</Text>
+              </View>
+            </View>
+            <Text style={styles.promoTitle}>Tonight's reward is ready 🎉</Text>
+            <Text style={styles.promoSub}>You checked in today — voucher unlocks at 8PM.</Text>
+            <View style={styles.rewardBoxes}>
+              <View style={styles.rewardBox}><Text style={styles.rewardBoxText}>₱20{'\n'}GCash</Text></View>
+              <View style={styles.rewardBox}><Text style={styles.rewardBoxText}>₱25{'\n'}Grab</Text></View>
+              <View style={styles.rewardBox}><Text style={styles.rewardBoxText}>Free{'\n'}Coffee</Text></View>
+              <Pressable style={styles.unlockBox}>
+                <Text style={styles.unlockBoxText}>Unlock{'\n'}→</Text>
+              </Pressable>
+            </View>
+          </LinearGradient>
+
+
+          {/* 4. Advanced Live Tracker (with Meditate) */}
+          <View style={[styles.trackerCard, trackerState !== 'idle' && styles.trackerCardActive]}>
+            
+            <View style={styles.trackerHeader}>
+              <Text style={styles.sectionTitle}>Record Activity</Text>
+              {(trackerState === 'tracking' || trackerState === 'countdown') && <View style={styles.liveDot} />}
+            </View>
+
+            {trackerState === 'idle' && (
+              <>
+                <View style={styles.activitySelector}>
+                  {(['walk', 'run', 'bike', 'meditate'] as ActivityType[]).map((type) => {
+                    const isSelected = activityType === type
+                    let iconName = 'walk'
+                    if (type === 'bike') iconName = 'bicycle'
+                    if (type === 'run') iconName = 'flash'
+                    if (type === 'meditate') iconName = 'heart'
+
+                    return (
+                      <Pressable
+                        key={type}
+                        onPress={() => setActivityType(type)}
+                        style={[styles.activityBtn, isSelected && styles.activityBtnSelected]}
+                      >
+                        <Ionicons name={iconName as any} size={16} color={isSelected ? COLORS.white : COLORS.textSecondary} />
+                        <Text style={[styles.activityBtnText, isSelected && styles.activityBtnTextSelected]}>
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+                
+                <Pressable onPress={initiateActivity} style={styles.primaryActionBtn}>
+                  <Text style={styles.primaryActionText}>
+                    Start {activityType.charAt(0).toUpperCase() + activityType.slice(1)}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+
+            {trackerState === 'countdown' && (
+              <View style={styles.countdownContainer}>
+                <Text style={styles.countdownTitle}>Get Ready...</Text>
+                <Text style={styles.countdownNumber}>{countdownVal}</Text>
+              </View>
+            )}
+
+            {(trackerState === 'tracking' || trackerState === 'paused') && (
+              <View style={styles.activeTrackerContainer}>
+                
+                <Text style={styles.liveTimer}>{formatTimer(trackSecs)}</Text>
+                <Text style={styles.liveTimerLabel}>ELAPSED TIME</Text>
+                
+                {/* Only show metrics if NOT meditating */}
+                {activityType !== 'meditate' && (
+                  <View style={styles.liveStatsRow}>
+                    <View style={styles.liveStatItem}>
+                      <Text style={styles.liveStatValue}>{liveKm.toFixed(2)}</Text>
+                      <Text style={styles.liveStatLabel}>km</Text>
+                    </View>
+                    
+                    {activityType !== 'bike' && (
+                      <>
+                        <View style={styles.liveStatDivider} />
+                        <View style={styles.liveStatItem}>
+                          <Text style={styles.liveStatValue}>{currentSteps}</Text>
+                          <Text style={styles.liveStatLabel}>steps</Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                )}
+
+                {/* Actions */}
+                <View style={[styles.trackerControlsRow, activityType === 'meditate' && { marginTop: 24 }]}>
+                  <Pressable 
+                    onPress={togglePause} 
+                    style={[styles.controlBtn, trackerState === 'paused' ? styles.btnResume : styles.btnPause]}
+                  >
+                    <Ionicons name={trackerState === 'paused' ? "play" : "pause"} size={18} color={trackerState === 'paused' ? COLORS.white : COLORS.orangeDark} />
+                    <Text style={[styles.controlBtnText, trackerState === 'paused' ? { color: COLORS.white } : { color: COLORS.orangeDark }]}>
+                      {trackerState === 'paused' ? 'Resume' : 'Pause'}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable onPress={finishActivity} style={[styles.controlBtn, styles.btnFinish]}>
+                    <Ionicons name="stop" size={18} color={COLORS.white} />
+                    <Text style={[styles.controlBtnText, { color: COLORS.white }]}>Finish</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              
+            )}
+
+            
+
+          </View>
+
+                    {/* 3. Refactored Premium "Today's Progress" */}
+                    <View style={styles.progressCard}>
+            <Text style={styles.sectionTitle}>Today's Progress</Text>
+            
+            {/* Main Progress Ring */}
+            <View style={styles.mainProgressCenter}>
+              <View style={[styles.largeCircleOuter, { borderColor: `${COLORS.teal}22` }]}>
+                <View style={[styles.largeCircleInner, { 
+                  borderColor: COLORS.teal, 
+                  borderTopColor: stepsPercentage > 0.25 ? COLORS.teal : 'transparent',
+                  borderRightColor: stepsPercentage > 0.5 ? COLORS.teal : 'transparent',
+                  borderBottomColor: stepsPercentage > 0.75 ? COLORS.teal : 'transparent'
+                }]}>
+                  <Text style={styles.largeStepsLabel}>Daily Steps</Text>
+                  <Text style={styles.largeStepsText}>{steps.toLocaleString()}</Text>
+                  <Text style={styles.largeStepsSub}>/ 10,000 steps</Text>
+                  <View style={styles.pctBadge}>
+                    <Text style={styles.pctText}>{Math.floor(stepsPercentage * 100)}%</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Horizontal Mini Cards */}
+            <View style={styles.miniStatsRow}>
+              {/* Active Mins */}
+              <View style={styles.miniCard}>
+                <View style={[styles.miniIconBox, { backgroundColor: COLORS.lightGreen }]}>
+                  <Ionicons name="time" size={16} color={COLORS.green} />
+                </View>
+                <Text style={styles.miniCardTitle}>Active</Text>
+                <Text style={styles.miniCardValue}>{actMins} <Text style={styles.miniCardUnit}>m</Text></Text>
+                {/* Mini bar */}
+                <View style={styles.miniBarTrack}>
+                  <View style={[styles.miniBarFill, { width: `${Math.min((actMins/60)*100, 100)}%`, backgroundColor: COLORS.green }]} />
+                </View>
+              </View>
+
+              {/* Tappable Water */}
+              <View style={styles.miniCard}>
+                <View style={[styles.miniIconBox, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="water" size={16} color="#0284C7" />
+                </View>
+                <Text style={styles.miniCardTitle}>Water</Text>
+                <Text style={styles.miniCardValue}>{localWater} <Text style={styles.miniCardUnit}>/8</Text></Text>
+                {/* Stepper Controls */}
+                <View style={styles.stepperControls}>
+                  <Pressable onPress={() => handleWaterChange(-1)} style={styles.stepperBtn}>
+                    <Ionicons name="remove" size={14} color="#0284C7" />
+                  </Pressable>
+                  <Pressable onPress={() => handleWaterChange(1)} style={styles.stepperBtn}>
+                    <Ionicons name="add" size={14} color="#0284C7" />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Calories */}
+              <View style={styles.miniCard}>
+                <View style={[styles.miniIconBox, { backgroundColor: '#FFF8E1' }]}>
+                  <Ionicons name="flame" size={16} color={COLORS.orangeDark} />
+                </View>
+                <Text style={styles.miniCardTitle}>Burned</Text>
+                <Text style={styles.miniCardValue}>{calories} <Text style={styles.miniCardUnit}>kcal</Text></Text>
+                {/* Mini graph simulation */}
+                <View style={styles.miniGraph}>
+                  <View style={[styles.graphBar, { height: 8 }]} />
+                  <View style={[styles.graphBar, { height: 16 }]} />
+                  <View style={[styles.graphBar, { height: 12 }]} />
+                  <View style={[styles.graphBar, { height: 22 }]} />
+                </View>
+              </View>
+
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-        </Pressable>
 
+
+        </View>
       </ScrollView>
 
       {/* ── Profile Drawer ── */}
-      <ProfileDrawer
-        visible={showDrawer}
-        onClose={() => setShowDrawer(false)}
-        user={user}
-      />
-
+      <ProfileDrawer visible={showDrawer} onClose={() => setShowDrawer(false)} user={user} />
     </SafeAreaView>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { paddingBottom: 40 },
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
 
-  header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
+const styles = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: COLORS.navy },
+  
+  // Header Styles
+  headerBg: {
+    backgroundColor: COLORS.navy,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerContent: {
     paddingHorizontal: 20,
-    paddingTop:        16,
-    paddingBottom:     4,
+    paddingBottom: 24,
+    paddingTop: 16, 
   },
-  dateText: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginBottom: 2 },
-  greeting: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
-  avatar: {
-    width:           40,
-    height:          40,
-    borderRadius:    20,
-    backgroundColor: '#3FE870',
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     2,
-    borderColor:     '#ffffff',
-  },
-  avatarText: { fontSize: 16, fontWeight: '900', color: '#0d2210' },
-
-  section: {
-    paddingHorizontal: 16,
-    paddingTop:        20,
-  },
-  grid: {
+  headerTopRow: {
     flexDirection: 'row',
-    gap:           10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-
-  habitGrid: { gap: 10 },
-  habitRow:  { flexDirection: 'row', gap: 10 },
-
-  // March Step Challenge
-  challengeCard: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   '#1e1040',
-    borderRadius:      16,
-    marginHorizontal:  16,
-    marginTop:         20,
-    padding:           16,
-    gap:               12,
+  greetingText: {
+    fontSize: 14,
+    color: COLORS.white,
+    fontWeight: '500',
+    opacity: 0.9,
   },
-  challengeLeft:    { justifyContent: 'center' },
-  challengeEmoji:   { fontSize: 28 },
-  challengeText:    { flex: 1, gap: 4 },
-  challengeTitle:   { fontSize: 14, fontWeight: '800', color: '#ffffff' },
-  challengeSub:     { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
-  challengeBarTrack:{
-    height:          6,
-    borderRadius:    3,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  streakBadge: {
     backgroundColor: 'rgba(255,255,255,0.15)',
-    overflow:        'hidden',
-    marginTop:       4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  challengeBarFill: {
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: '#FFC091',
+  streakText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.orange,
   },
-  challengePct:     { alignItems: 'center' },
-  challengePctText: { fontSize: 15, fontWeight: '900', color: '#FFC091' },
+  iconBtn: {
+    width: 36, height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatar: {
+    width: 36, height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  nameRankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  headerRankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  headerRankText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  headerBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  deptText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  pointsWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pointsText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.orangeDark,
+  },
 
-  // Promo Hour card
-  promoCard: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   '#1a0a00',
-    borderRadius:      16,
-    marginHorizontal:  16,
-    marginTop:         12,
-    padding:           16,
-    gap:               12,
-    borderWidth:       1,
-    borderColor:       '#FF6B0033',
+  // Scroll Content
+  scroll: { 
+    paddingBottom: 40,
   },
-  promoLeft:    {},
-  promoIconBox: {
-    width:           44,
-    height:          44,
-    borderRadius:    12,
-    backgroundColor: '#FF6B0022',
-    alignItems:      'center',
-    justifyContent:  'center',
+  cardsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 16,
   },
-  promoIcon:    { fontSize: 22 },
-  promoText:    { flex: 1, gap: 4 },
-  promoTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  promoTitle:   { fontSize: 14, fontWeight: '800', color: '#ffffff' },
-  promoBadge: {
-    backgroundColor:   '#FF6B00',
-    borderRadius:      6,
-    paddingHorizontal: 6,
-    paddingVertical:   2,
+
+  // Daily Check-in Card (Soft UI update)
+  // Daily Check-in Card Specifics
+  checkInCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,     // Reduced from 20
+    padding: 12,          // Reduced from 16
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8 },
+      android: { elevation: 2 },
+    }),
   },
-  promoBadgeText: { fontSize: 9, fontWeight: '800', color: '#ffffff', letterSpacing: 0.4 },
-  promoSub:       { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
-  promoMeta:      { flexDirection: 'row', gap: 4 },
-  promoMetaText:  { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
+  checkInRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 10               // Reduced from 14
+  },
+  checkIconWrap: { 
+    width: 36,            // Reduced from 50
+    height: 36,           // Reduced from 50
+    borderRadius: 12,     // Reduced from 16
+    backgroundColor: COLORS.lightGreen, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  checkInTextWrap: { 
+    flex: 1,
+  },
+  cardTitle: { 
+    fontSize: 14,         // Reduced from 15
+    fontWeight: '700', 
+    color: COLORS.navy, 
+    marginBottom: 2,      // Reduced from 4
+  },
+  cardSub: { 
+    fontSize: 11,         // Reduced from 12
+    color: COLORS.textSecondary, 
+  },
+  ptsBadge: { 
+    backgroundColor: '#FFF8E1', 
+    paddingHorizontal: 8, // Reduced from 10
+    paddingVertical: 4,   // Reduced from 6
+    borderRadius: 12, 
+  },
+  ptsBadgeText: { 
+    fontSize: 11,         // Reduced from 12
+    fontWeight: '700', 
+    color: COLORS.orangeDark, 
+  },
+  // Promo Card
+  promoGradient: { 
+    borderRadius: 20, 
+    padding: 20, 
+    ...Platform.select({
+      ios: { shadowColor: COLORS.teal, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 4 },
+    })
+  },
+  promoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  promoHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  giftIcon: { fontSize: 16 },
+  promoLabel: { fontSize: 11, fontWeight: '800', color: COLORS.white, letterSpacing: 0.5 },
+  timeBadge: { backgroundColor: 'rgba(0,0,0,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  timeBadgeText: { fontSize: 11, fontWeight: '700', color: COLORS.orange },
+  promoTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white, marginBottom: 4 },
+  promoSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 20 },
+  rewardBoxes: { flexDirection: 'row', gap: 10 },
+  rewardBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center' },
+  rewardBoxText: { color: COLORS.white, fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 18 },
+  unlockBox: { flex: 1, backgroundColor: COLORS.bgGray, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  unlockBoxText: { color: COLORS.purple, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 18 },
+
+  // New "Today's Progress" Design
+  progressCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16 },
+      android: { elevation: 3 },
+    }),
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  mainProgressCenter: {
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  largeCircleOuter: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  largeCircleInner: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 10,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  largeStepsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  largeStepsText: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: COLORS.navy,
+    letterSpacing: -1,
+  },
+  largeStepsSub: {
+    fontSize: 12,
+    color: COLORS.disabledText,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  pctBadge: {
+    backgroundColor: COLORS.lightTeal,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  pctText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.teal,
+  },
+  
+  // Mini Horizontal Cards
+  miniStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  miniCard: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  miniIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  miniCardTitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  miniCardValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.navy,
+    marginBottom: 8,
+  },
+  miniCardUnit: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.disabledText,
+  },
+  
+  // Custom Card Internals
+  miniBarTrack: {
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  miniBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  stepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#E0F2FE',
+    borderRadius: 8,
+    padding: 4,
+  },
+  stepperBtn: {
+    backgroundColor: COLORS.white,
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  miniGraph: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    height: 22,
+  },
+  graphBar: {
+    flex: 1,
+    backgroundColor: COLORS.orangeDark,
+    borderRadius: 2,
+    opacity: 0.8,
+  },
+
+  // Advanced Activity Tracker
+  trackerCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 16 },
+      android: { elevation: 3 },
+    }),
+  },
+  trackerCardActive: {
+    backgroundColor: COLORS.navy, // Dark mode for active tracker stands out beautifully
+    borderColor: COLORS.navy,
+  },
+  trackerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+  },
+  
+  // Tracker - Idle
+  activitySelector: {
+    flexDirection: 'row',
+    backgroundColor: '#F4F7FA',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
+  },
+  activityBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  activityBtnSelected: {
+    backgroundColor: COLORS.teal,
+    shadowColor: COLORS.teal,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  activityBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  activityBtnTextSelected: {
+    color: COLORS.white,
+  },
+  primaryActionBtn: {
+    backgroundColor: COLORS.teal,
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  primaryActionText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+
+  // Tracker - Countdown
+  countdownContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  countdownTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 10,
+  },
+  countdownNumber: {
+    fontSize: 84,
+    fontWeight: '900',
+    color: COLORS.teal,
+  },
+  
+  // Tracker - Live
+  activeTrackerContainer: {
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  liveTimer: {
+    fontSize: 56,
+    fontWeight: '900',
+    color: COLORS.white,
+    fontVariant: ['tabular-nums'], 
+  },
+  liveTimerLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 1.5,
+    marginBottom: 24,
+  },
+  liveStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 30,
+    marginBottom: 32,
+  },
+  liveStatItem: {
+    alignItems: 'center',
+  },
+  liveStatValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  liveStatLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  liveStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+
+  // Tracker - Controls
+  trackerControlsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  controlBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 18,
+    borderRadius: 16,
+  },
+  btnPause: {
+    backgroundColor: '#FFF8E1',
+  },
+  btnResume: {
+    backgroundColor: COLORS.teal,
+  },
+  btnFinish: {
+    backgroundColor: '#EF4444', 
+  },
+  controlBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
 })

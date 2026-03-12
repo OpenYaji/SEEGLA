@@ -1,603 +1,274 @@
 /**
- * Rewards — Challenges & Rewards Store
+ * Rewards Store Screen
  *
- * Layout:
- *   1. Dark green header — "Rewards 🎁" + points badge
- *   2. Progress to Platinum card
- *   3. Tab toggle: Challenges | Rewards Store
- *   4a. Challenges tab — list with progress bars, JOINED/Join badge
- *   4b. Rewards Store tab — 2-column grid with Redeem button
+ * Features:
+ * - Purple to Teal gradient header with glassmorphism stats
+ * - Rank Progress Card (Beginner -> Veteran -> Pro)
+ * - Category Filter Chips
+ * - Rank-locked Rewards (Requires specific rank to redeem)
  */
 
-import React, { useCallback, useEffect, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
+import React, { useState } from 'react'
 import {
-  View,
-  Text,
+  Dimensions,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
-  Pressable,
-  RefreshControl,
-  Platform,
-  Alert,
-  ActivityIndicator,
+  Text,
+  View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 
-import { useAuth } from '@/lib/auth-context'
-import { supabase } from '@/lib/supabase'
+const { width } = Dimensions.get('window')
+const CARD_WIDTH = (width - 50) / 2 // 2 columns with padding
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types
+// Brand Colors & Theme
 // ─────────────────────────────────────────────────────────────────────────────
-
-interface Challenge {
-  id:            string
-  title:         string
-  description:   string
-  category:      string
-  points_reward: number
-  target_value:  number
-  metric_type:   string
-  // injected locally
-  emoji?:        string
-  current_value?: number
-  days_left?:    number
-  prize_label?:  string
-  is_joined?:    boolean
-}
-
-interface Reward {
-  id:          string
-  title:       string
-  description: string
-  category:    string
-  points_cost: number
-  is_active:   boolean
-  // injected locally
-  emoji?:      string
-}
-
-interface PointsBalance {
-  total_points:     number
-  available_points: number
+const COLORS = {
+  navy: '#1E2356',     
+  teal: '#00C4C7',     
+  purple: '#6244CB',   
+  orange: '#FFB185',   
+  orangeDark: '#F59E0B',
+  green: '#4CAF7A',    
+  lightGreen: '#E8F5E9',
+  bgGray: '#F7F9FC',   
+  white: '#FFFFFF',
+  textPrimary: '#1E2356',
+  textSecondary: '#64748B',
+  border: '#E5E7EB',
+  disabledText: '#94A3B8'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Demo data (used when DB is empty)
+// Rank Logic & Hierarchy
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEMO_CHALLENGES: Challenge[] = [
-  {
-    id:            'd1',
-    title:         '10K Steps Streak',
-    emoji:         '🏃',
-    description:   'Walk 10,000 steps daily for 7 days',
-    category:      'fitness',
-    points_reward: 500,
-    target_value:  7,
-    current_value: 5,
-    metric_type:   'steps',
-    days_left:     2,
-    prize_label:   '₱100 GCash',
-    is_joined:     true,
-  },
-  {
-    id:            'd2',
-    title:         'Hydration Hero',
-    emoji:         '💧',
-    description:   'Log 8 glasses of water for 5 days',
-    category:      'nutrition',
-    points_reward: 300,
-    target_value:  5,
-    current_value: 3,
-    metric_type:   'hydration',
-    days_left:     4,
-    prize_label:   'Grab Voucher',
-    is_joined:     true,
-  },
-  {
-    id:            'd3',
-    title:         'Mindfulness March',
-    emoji:         '🧘',
-    description:   'Complete 10-min meditation 10x this month',
-    category:      'mindful',
-    points_reward: 750,
-    target_value:  10,
-    current_value: 4,
-    metric_type:   'meditation',
-    days_left:     21,
-    prize_label:   'Wellness Kit',
-    is_joined:     false,
-  },
+// Assign numerical values to ranks to easily compare if a user qualifies
+const RANK_LEVELS: Record<string, number> = {
+  'Beginner': 1,
+  'Veteran':  2,
+  'Pro':      3,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mock Data
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FILTERS = [
+  { id: 'all', label: 'All', emoji: '✨' },
+  { id: 'food', label: 'Food', emoji: '🍔' },
+  { id: 'gcash', label: 'GCash', emoji: '💸' },
+  { id: 'coffee', label: 'Coffee', emoji: '☕' },
 ]
 
-const DEMO_REWARDS: Reward[] = [
-  { id: 'r1', title: 'GCash ₱100',    emoji: '💚', category: 'Cash',     points_cost: 500,  description: '', is_active: true },
-  { id: 'r2', title: 'Grab ₱150',     emoji: '🚗', category: 'Voucher',  points_cost: 750,  description: '', is_active: true },
-  { id: 'r3', title: 'Jollibee ₱200', emoji: '🍔', category: 'Food',     points_cost: 900,  description: '', is_active: true },
-  { id: 'r4', title: 'SM Gift Card',  emoji: '🛍️', category: 'Shopping', points_cost: 1200, description: '', is_active: true },
+const REWARDS = [
+  { id: '1', title: '₱20 GrabFood Voucher', sub: '48 left · GrabFood', points: 200, category: 'food', topColor: COLORS.green, icon: '🚗', requiredRank: 'Beginner' },
+  { id: '2', title: '₱25 Shopee Voucher', sub: '60 left · Shopee', points: 250, category: 'all', topColor: COLORS.orangeDark, icon: '🛍️', requiredRank: 'Beginner' },
+  { id: '3', title: '₱30 Grab Voucher', sub: '40 left · Grab', points: 300, category: 'food', topColor: COLORS.green, icon: '🚗', requiredRank: 'Veteran' },
+  { id: '4', title: 'Free SB Coffee', sub: '20 left · Starbucks', points: 450, category: 'coffee', topColor: '#059669', icon: '☕', requiredRank: 'Veteran' },
+  { id: '5', title: '₱50 GCash Credits', sub: '12 left · GCash', points: 500, category: 'gcash', topColor: '#3b82f6', icon: '📱', requiredRank: 'Pro' },
+  { id: '6', title: '₱100 GrabCar', sub: '5 left · Grab', points: 800, category: 'all', topColor: '#059669', icon: '🚘', requiredRank: 'Pro' },
 ]
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  fitness:   '🏃',
-  nutrition: '🥗',
-  sleep:     '😴',
-  mindful:   '🧘',
-  social:    '👥',
-  default:   '⭐',
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Challenge card
+// Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ChallengeCard({
-  challenge,
-  onJoin,
-}: {
-  challenge: Challenge
-  onJoin:    (id: string) => void
-}) {
-  const joined    = challenge.is_joined ?? false
-  const progress  = Math.min((challenge.current_value ?? 0) / (challenge.target_value || 1), 1)
-  const emoji     = challenge.emoji ?? CATEGORY_EMOJI[challenge.category] ?? CATEGORY_EMOJI.default
-
+function ProgressBar({ progress, color = COLORS.teal }: { progress: number; color?: string }) {
   return (
-    <View style={[cc.card, joined && cc.cardJoined]}>
-      {/* Top row */}
-      <View style={cc.topRow}>
-        <View style={cc.iconBox}>
-          <Text style={cc.iconEmoji}>{emoji}</Text>
-        </View>
-        <View style={cc.meta}>
-          <View style={cc.titleRow}>
-            <Text style={cc.title} numberOfLines={1}>{challenge.title}</Text>
-            {joined ? (
-              <View style={cc.joinedBadge}>
-                <Text style={cc.joinedText}>JOINED</Text>
-              </View>
-            ) : (
-              <Pressable
-                style={({ pressed }) => [cc.joinBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => onJoin(challenge.id)}
-              >
-                <Text style={cc.joinBtnText}>Join</Text>
-              </Pressable>
-            )}
-          </View>
-          <Text style={cc.desc} numberOfLines={2}>{challenge.description}</Text>
-          {challenge.days_left !== undefined && (
-            <Text style={cc.daysLeft}>{challenge.days_left} days left</Text>
-          )}
-        </View>
-      </View>
-
-      {/* Progress bar */}
-      {joined && challenge.current_value !== undefined && (
-        <View style={cc.progressSection}>
-          <View style={cc.progressTrack}>
-            <View style={[cc.progressFill, { width: `${progress * 100}%` as any }]} />
-          </View>
-          <Text style={cc.progressLabel}>
-            {challenge.current_value}/{challenge.target_value} {challenge.metric_type === 'steps' ? 'days' : 'days'}
-          </Text>
-        </View>
-      )}
-
-      {/* Reward row */}
-      <View style={cc.rewardRow}>
-        <Text style={cc.rewardEmoji}>🎁</Text>
-        <Text style={cc.rewardText}>
-          {challenge.points_reward} pts{challenge.prize_label ? ` + ${challenge.prize_label}` : ''}
-        </Text>
-      </View>
+    <View style={s.progressTrack}>
+      <View style={[s.progressFill, { width: `${progress}%`, backgroundColor: color }]} />
     </View>
   )
 }
 
-const cc = StyleSheet.create({
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius:    14,
-    borderWidth:     1.5,
-    borderColor:     '#e2e8f0',
-    padding:         14,
-    marginBottom:    12,
-    gap:             10,
-  },
-  cardJoined: {
-    borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
-  },
-  topRow: {
-    flexDirection: 'row',
-    gap:           12,
-    alignItems:    'flex-start',
-  },
-  iconBox: {
-    width:          44,
-    height:         44,
-    borderRadius:   12,
-    backgroundColor: '#f0fdf4',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  iconEmoji: { fontSize: 22 },
-  meta: {
-    flex: 1,
-    gap:  4,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           8,
-    flexWrap:      'wrap',
-  },
-  title: {
-    fontSize:   14,
-    fontWeight: '800',
-    color:      '#0f172a',
-    flexShrink: 1,
-  },
-  joinedBadge: {
-    backgroundColor:   '#1a3a1a',
-    borderRadius:      99,
-    paddingHorizontal: 8,
-    paddingVertical:   3,
-  },
-  joinedText: {
-    fontSize:      9,
-    fontWeight:    '800',
-    color:         '#3FE870',
-    letterSpacing: 0.5,
-  },
-  joinBtn: {
-    borderRadius:      99,
-    borderWidth:       1.5,
-    borderColor:       '#3FE870',
-    paddingHorizontal: 10,
-    paddingVertical:   3,
-  },
-  joinBtnText: {
-    fontSize:   11,
-    fontWeight: '700',
-    color:      '#16a34a',
-  },
-  desc: {
-    fontSize:   12,
-    color:      '#475569',
-    lineHeight: 17,
-  },
-  daysLeft: {
-    fontSize:   11,
-    color:      '#94a3b8',
-    fontWeight: '500',
-  },
-  progressSection: {
-    gap: 5,
-  },
-  progressTrack: {
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: '#e2e8f0',
-    overflow:        'hidden',
-  },
-  progressFill: {
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: '#FF6B00',
-  },
-  progressLabel: {
-    fontSize:  11,
-    color:     '#64748b',
-    fontWeight:'600',
-    textAlign: 'right',
-  },
-  rewardRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               6,
-    backgroundColor:   '#fff7ed',
-    borderRadius:      8,
-    paddingHorizontal: 10,
-    paddingVertical:   7,
-  },
-  rewardEmoji: { fontSize: 14 },
-  rewardText: {
-    fontSize:   12,
-    fontWeight: '700',
-    color:      '#c2410c',
-  },
-})
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Reward card (2-column grid)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function RewardCard({
-  reward,
-  availablePoints,
-  onRedeem,
-  redeeming,
-}: {
-  reward:          Reward
-  availablePoints: number
-  onRedeem:        (id: string, cost: number, title: string) => void
-  redeeming:       boolean
-}) {
-  const canAfford = availablePoints >= reward.points_cost
-  const emoji     = reward.emoji ?? '🎁'
-
-  return (
-    <View style={[rc.card, canAfford && rc.cardAffordable]}>
-      <View style={rc.topRow}>
-        <Text style={rc.emoji}>{emoji}</Text>
-        <View style={rc.catBadge}>
-          <Text style={rc.catText}>{reward.category}</Text>
-        </View>
-      </View>
-      <Text style={rc.title}>{reward.title}</Text>
-      <Text style={rc.pts}>{reward.points_cost.toLocaleString()} pts</Text>
-      <Pressable
-        onPress={() => canAfford && onRedeem(reward.id, reward.points_cost, reward.title)}
-        disabled={!canAfford || redeeming}
-        style={({ pressed }) => [
-          rc.redeemBtn,
-          !canAfford && rc.redeemBtnDisabled,
-          pressed && canAfford && { opacity: 0.85 },
-        ]}
-      >
-        {redeeming ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Text style={[rc.redeemText, !canAfford && rc.redeemTextDisabled]}>
-            {canAfford ? 'Redeem →' : 'Need more'}
-          </Text>
-        )}
-      </Pressable>
-    </View>
-  )
-}
-
-const rc = StyleSheet.create({
-  card: {
-    flex:            1,
-    backgroundColor: '#ffffff',
-    borderRadius:    14,
-    borderWidth:     1.5,
-    borderColor:     '#e2e8f0',
-    padding:         14,
-    gap:             6,
-  },
-  cardAffordable: {
-    borderColor:     '#bbf7d0',
-  },
-  topRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    marginBottom:   4,
-  },
-  emoji: { fontSize: 26 },
-  catBadge: {
-    backgroundColor:   '#f0fdf4',
-    borderRadius:      99,
-    paddingHorizontal: 7,
-    paddingVertical:   3,
-    borderWidth:       1,
-    borderColor:       '#bbf7d0',
-  },
-  catText: {
-    fontSize:   9,
-    fontWeight: '700',
-    color:      '#16a34a',
-    letterSpacing: 0.3,
-  },
-  title: {
-    fontSize:   13,
-    fontWeight: '800',
-    color:      '#16a34a',
-    lineHeight: 18,
-  },
-  pts: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#3FE870',
-  },
-  redeemBtn: {
-    backgroundColor: '#1a3a1a',
-    borderRadius:    10,
-    paddingVertical: 10,
-    alignItems:      'center',
-    marginTop:       4,
-  },
-  redeemBtnDisabled: {
-    backgroundColor: '#e2e8f0',
-  },
-  redeemText: {
-    fontSize:   13,
-    fontWeight: '800',
-    color:      '#ffffff',
-  },
-  redeemTextDisabled: {
-    color: '#94a3b8',
-  },
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Rewards Screen
+// Main Screen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RewardsScreen() {
-  const { user } = useAuth()
+  const [activeFilter, setActiveFilter] = useState('all')
 
-  const [balance,      setBalance]      = useState<PointsBalance>({ total_points: 1420, available_points: 1420 })
-  const [challenges,   setChallenges]   = useState<Challenge[]>(DEMO_CHALLENGES)
-  const [rewards,      setRewards]      = useState<Reward[]>(DEMO_REWARDS)
-  const [activeTab,    setActiveTab]    = useState<'challenges' | 'store'>('challenges')
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [redeeming,    setRedeeming]    = useState<string | null>(null)
+  // Mock User Stats
+  const userPoints = 1240
+  const monthlyEarned = 340
+  const rewardsRedeemed = 3
+  const currentStreak = 5
 
-  const load = useCallback(async () => {
-    if (!user) return
-    const [balRes, chRes, rwRes] = await Promise.all([
-      supabase.from('user_points').select('total_points, available_points').eq('user_id', user.id).maybeSingle(),
-      supabase.from('challenges').select('id, title, description, category, points_reward, target_value, metric_type').eq('is_active', true).limit(10),
-      supabase.from('rewards').select('id, title, description, category, points_cost, is_active').eq('is_active', true).order('points_cost', { ascending: true }).limit(8),
-    ])
-    if (balRes.data) setBalance(balRes.data as PointsBalance)
-    if (chRes.data && chRes.data.length > 0) setChallenges(chRes.data as Challenge[])
-    if (rwRes.data && rwRes.data.length > 0)  setRewards(rwRes.data as Reward[])
-  }, [user])
+  // User Rank Details
+  const currentRank = 'Veteran' // Change this to 'Beginner' or 'Pro' to test the lock feature!
+  const nextRank = 'Pro'
+  const rankProgress = 65 
+  const pointsToNext = 260
 
-  useEffect(() => { load() }, [load])
+  const userRankValue = RANK_LEVELS[currentRank] || 1
 
-  const onRefresh = async () => { setIsRefreshing(true); await load(); setIsRefreshing(false) }
-
-  const handleJoin = (id: string) => {
-    setChallenges((prev) => prev.map((c) => c.id === id ? { ...c, is_joined: true } : c))
-  }
-
-  const handleRedeem = (rewardId: string, cost: number, title: string) => {
-    if (!user) return
-    Alert.alert(
-      'Redeem Reward',
-      `Spend ${cost.toLocaleString()} pts on ${title}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Redeem',
-          onPress: async () => {
-            setRedeeming(rewardId)
-            try {
-              if (user.id) {
-                const { data: pts } = await supabase.from('user_points').select('available_points').eq('user_id', user.id).maybeSingle()
-                if (pts && (pts.available_points ?? 0) >= cost) {
-                  await Promise.all([
-                    supabase.from('user_points').update({ available_points: (pts.available_points ?? 0) - cost }).eq('user_id', user.id),
-                    supabase.from('points_transactions').insert({ user_id: user.id, org_id: user.org_id, points: cost, transaction_type: 'spent', description: `Redeemed: ${title}`, reference_id: rewardId }),
-                  ])
-                  setBalance((prev) => ({ ...prev, available_points: prev.available_points - cost }))
-                }
-              }
-              Alert.alert('Redeemed! 🎉', 'Your HR team has been notified. Enjoy your reward!')
-            } finally {
-              setRedeeming(null)
-            }
-          },
-        },
-      ]
-    )
-  }
-
-  const availablePts = balance.available_points
-  const platinumGoal = 2000
-  const platinumProgress = Math.min(availablePts / platinumGoal, 1)
-  const remainingPts = Math.max(0, platinumGoal - availablePts)
-
-  // Rewards Store — split into 2-column pairs
-  const rewardPairs: Reward[][] = []
-  for (let i = 0; i < rewards.length; i += 2) {
-    rewardPairs.push(rewards.slice(i, i + 2))
-  }
+  // Filter Logic
+  const displayedRewards = activeFilter === 'all' 
+    ? REWARDS 
+    : REWARDS.filter(r => r.category === activeFilter)
 
   return (
-    <SafeAreaView style={styles.root}>
+    <View style={s.root}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+        
+        {/* ── 1. Gradient Header ── */}
+        <LinearGradient 
+          colors={[COLORS.purple, COLORS.teal]} 
+          start={{ x: 0, y: 0 }} 
+          end={{ x: 1, y: 1 }} 
+          style={s.headerGradient}
+        >
+          <SafeAreaView edges={['top']} style={s.safeHeader}>
+            <Text style={s.headerSubtitle}>Your Balance</Text>
+            <View style={s.balanceRow}>
+              <Text style={s.balanceText}>{userPoints.toLocaleString()}</Text>
+              <Text style={s.balancePts}>pts</Text>
+            </View>
+            <Text style={s.headerDesc}>Earn more by completing challenges and check-ins</Text>
 
-      {/* ── Dark green header ── */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Rewards 🎁</Text>
-          <Text style={styles.headerSub}>Earn points · Redeem perks</Text>
-        </View>
-        <View style={styles.ptsBadge}>
-          <Ionicons name="diamond" size={14} color="#60a5fa" />
-          <View>
-            <Text style={styles.ptsBadgeNum}>{availablePts.toLocaleString()}</Text>
-            <Text style={styles.ptsBadgeLabel}>Your Points</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#3FE870" />}
-      >
-
-        {/* ── Progress to Platinum ── */}
-        <View style={styles.platCard}>
-          <View style={styles.platTop}>
-            <Text style={styles.platLabel}>Progress to Platinum 🏆</Text>
-            <Text style={styles.platPts}>{availablePts.toLocaleString()} / {platinumGoal.toLocaleString()} pts</Text>
-          </View>
-          <View style={styles.platTrack}>
-            <View style={[styles.platFill, { width: `${platinumProgress * 100}%` as any }]} />
-          </View>
-          <Text style={styles.platSub}>{remainingPts > 0 ? `${remainingPts.toLocaleString()} more points to unlock Platinum benefits` : 'Platinum unlocked! 🎉'}</Text>
-        </View>
-
-        {/* ── Tab toggle ── */}
-        <View style={styles.tabRow}>
-          <Pressable
-            onPress={() => setActiveTab('challenges')}
-            style={[styles.tabBtn, activeTab === 'challenges' && styles.tabBtnActive]}
-          >
-            <Text style={[styles.tabText, activeTab === 'challenges' && styles.tabTextActive]}>Challenges</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveTab('store')}
-            style={[styles.tabBtn, activeTab === 'store' && styles.tabBtnActive]}
-          >
-            <Text style={[styles.tabText, activeTab === 'store' && styles.tabTextActive]}>Rewards Store</Text>
-          </Pressable>
-        </View>
-
-        {/* ── Challenges ── */}
-        {activeTab === 'challenges' && (
-          <View style={styles.tabContent}>
-            {challenges.map((c) => (
-              <ChallengeCard key={c.id} challenge={c} onJoin={handleJoin} />
-            ))}
-          </View>
-        )}
-
-        {/* ── Rewards Store ── */}
-        {activeTab === 'store' && (
-          <View style={styles.tabContent}>
-            {/* Balance card */}
-            <View style={styles.balanceCard}>
-              <View style={styles.balanceRow}>
-                <Ionicons name="diamond" size={16} color="#3b82f6" />
-                <Text style={styles.balanceText}>Your Balance: <Text style={styles.balancePts}>{availablePts.toLocaleString()} pts</Text></Text>
+            {/* Glassmorphism Stats Row */}
+            <View style={s.statsRow}>
+              <View style={s.statBox}>
+                <Text style={s.statLabel}>Redeemed</Text>
+                <View style={s.statValRow}>
+                  <Text style={s.statEmoji}>🎁</Text>
+                  <Text style={s.statValue}>{rewardsRedeemed}</Text>
+                </View>
               </View>
-              <Text style={styles.balanceSub}>
-                Eligible for {rewards.filter((r) => r.points_cost <= availablePts).length} rewards below
-              </Text>
+
+              <View style={s.statBox}>
+                <Text style={s.statLabel}>This Month</Text>
+                <View style={s.statValRow}>
+                  <Text style={s.statEmoji}>📈</Text>
+                  <Text style={s.statValue}>+{monthlyEarned}</Text>
+                </View>
+              </View>
+
+              <View style={s.statBox}>
+                <Text style={s.statLabel}>Streak</Text>
+                <View style={s.statValRow}>
+                  <Text style={s.statEmoji}>🔥</Text>
+                  <Text style={s.statValue}>{currentStreak} days</Text>
+                </View>
+              </View>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+
+        {/* ── 2. Rank Progress Card ── */}
+        <View style={s.rankContainer}>
+          <View style={s.rankCard}>
+            <View style={s.rankHeader}>
+              <View style={s.rankTitleRow}>
+                <View style={s.rankIconBox}>
+                  <Ionicons name="flash" size={16} color={COLORS.teal} />
+                </View>
+                <View>
+                  <Text style={s.rankLabel}>Current Rank</Text>
+                  <Text style={s.rankName}>{currentRank}</Text>
+                </View>
+              </View>
+              <View style={s.nextRankBox}>
+                <Ionicons name="trophy" size={12} color={COLORS.orangeDark} />
+                <Text style={s.nextRankText}>Next: {nextRank}</Text>
+              </View>
             </View>
 
-            {/* 2-column grid */}
-            {rewardPairs.map((pair, i) => (
-              <View key={i} style={styles.rewardRow}>
-                {pair.map((r) => (
-                  <RewardCard
-                    key={r.id}
-                    reward={r}
-                    availablePoints={availablePts}
-                    onRedeem={handleRedeem}
-                    redeeming={redeeming === r.id}
-                  />
-                ))}
-                {pair.length === 1 && <View style={{ flex: 1 }} />}
-              </View>
-            ))}
+            <ProgressBar progress={rankProgress} color={COLORS.teal} />
+            
+            <View style={s.rankFooter}>
+              <Text style={s.rankFooterText}>{rankProgress}% completed</Text>
+              <Text style={s.rankFooterPoints}>Earn {pointsToNext} more pts to rank up</Text>
+            </View>
           </View>
-        )}
+        </View>
+
+        {/* ── 3. Filters ── */}
+        <View style={s.filterWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+            {FILTERS.map((filter) => {
+              const isActive = activeFilter === filter.id
+              return (
+                <Pressable
+                  key={filter.id}
+                  onPress={() => setActiveFilter(filter.id)}
+                  style={[s.filterChip, isActive && s.filterChipActive]}
+                >
+                  <Text style={s.filterEmoji}>{filter.emoji}</Text>
+                  <Text style={[s.filterText, isActive && s.filterTextActive]}>{filter.label}</Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        </View>
+
+        {/* ── 4. Rewards Grid ── */}
+        <View style={s.rewardsSection}>
+          <Text style={s.sectionTitle}>
+            {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Rewards
+          </Text>
+
+          <View style={s.rewardsGrid}>
+            {displayedRewards.map((reward) => {
+              
+              // Rank validation check
+              const rewardRankValue = RANK_LEVELS[reward.requiredRank] || 1
+              const isLocked = userRankValue < rewardRankValue
+
+              return (
+                <View key={reward.id} style={[s.rewardCard, isLocked && s.rewardCardLocked]}>
+                  {/* Top Color Accent Line (Grayed out if locked) */}
+                  <View style={[s.cardTopBorder, { backgroundColor: isLocked ? COLORS.border : reward.topColor }]} />
+                  
+                  <View style={s.cardInner}>
+                    {/* Icon */}
+                    <View style={s.rewardIconBox}>
+                      <Text style={[s.rewardIcon, isLocked && { opacity: 0.4 }]}>{reward.icon}</Text>
+                    </View>
+
+                    {/* Title & Subtitle */}
+                    <Text style={[s.rewardTitle, isLocked && { color: COLORS.textSecondary }]} numberOfLines={2}>
+                      {reward.title}
+                    </Text>
+                    <Text style={s.rewardSub}>{reward.sub}</Text>
+
+                    <View style={s.spacer} />
+
+                    {/* Points & CTA Row */}
+                    <View style={s.rewardFooter}>
+                      <View style={[s.pointsWrapper, isLocked && { opacity: 0.5 }]}>
+                        <Ionicons name="star" size={13} color={COLORS.orangeDark} />
+                        <Text style={s.rewardPoints}>{reward.points}</Text>
+                        <Text style={s.rewardPtsLabel}>pts</Text>
+                      </View>
+
+                      {/* Redeem Button OR Lock Badge */}
+                      {isLocked ? (
+                        <View style={s.lockedBtn}>
+                          <Ionicons name="lock-closed" size={10} color={COLORS.disabledText} />
+                          <Text style={s.lockedBtnText}>{reward.requiredRank}</Text>
+                        </View>
+                      ) : (
+                        <Pressable style={s.redeemBtn}>
+                          <Text style={s.redeemBtnText}>Redeem</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )
+            })}
+          </View>
+        </View>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -605,162 +276,332 @@ export default function RewardsScreen() {
 // Styles
 // ─────────────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   root: {
-    flex:            1,
-    backgroundColor: '#f8fafc',
+    flex: 1,
+    backgroundColor: COLORS.bgGray,
   },
-
-  // Header
-  header: {
-    backgroundColor:   '#0d2210',
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
-    paddingHorizontal: 20,
-    paddingTop:        Platform.OS === 'android' ? 8 : 12,
-    paddingBottom:     16,
-  },
-  headerTitle: {
-    fontSize:   24,
-    fontWeight: '900',
-    color:      '#ffffff',
-  },
-  headerSub: {
-    fontSize:  12,
-    color:     'rgba(255,255,255,0.5)',
-    marginTop: 2,
-  },
-  ptsBadge: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               8,
-    backgroundColor:   '#1a3a1a',
-    borderRadius:      12,
-    paddingHorizontal: 12,
-    paddingVertical:   8,
-  },
-  ptsBadgeNum: {
-    fontSize:   15,
-    fontWeight: '900',
-    color:      '#ffffff',
-    lineHeight: 19,
-  },
-  ptsBadgeLabel: {
-    fontSize:  10,
-    color:     'rgba(255,255,255,0.5)',
-    lineHeight: 13,
-  },
-
-  scroll: {
+  scrollContent: {
     paddingBottom: 40,
   },
 
-  // Platinum card
-  platCard: {
-    backgroundColor:   '#0d2210',
-    marginHorizontal:  16,
-    marginTop:         16,
-    borderRadius:      16,
-    padding:           16,
-    gap:               8,
+  // Gradient Header
+  headerGradient: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingBottom: 24,
   },
-  platTop: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
+  safeHeader: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 20 : 10,
   },
-  platLabel: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#ffffff',
-  },
-  platPts: {
-    fontSize:   12,
-    fontWeight: '800',
-    color:      '#3FE870',
-  },
-  platTrack: {
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    overflow:        'hidden',
-  },
-  platFill: {
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: '#3FE870',
-  },
-  platSub: {
-    fontSize:  11,
-    color:     'rgba(255,255,255,0.45)',
-  },
-
-  // Tab toggle
-  tabRow: {
-    flexDirection:     'row',
-    marginHorizontal:  16,
-    marginTop:         20,
-    backgroundColor:   '#f1f5f9',
-    borderRadius:      12,
-    padding:           4,
-  },
-  tabBtn: {
-    flex:            1,
-    paddingVertical: 10,
-    alignItems:      'center',
-    borderRadius:    10,
-  },
-  tabBtnActive: {
-    backgroundColor: '#1a3a1a',
-  },
-  tabText: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#64748b',
-  },
-  tabTextActive: {
-    color: '#ffffff',
-  },
-
-  tabContent: {
-    paddingHorizontal: 16,
-    paddingTop:        16,
-    gap:               0,
-  },
-
-  // Balance card (store tab)
-  balanceCard: {
-    backgroundColor:   '#f0fdf4',
-    borderRadius:      12,
-    borderWidth:       1,
-    borderColor:       '#bbf7d0',
-    padding:           14,
-    marginBottom:      16,
-    gap:               4,
+  headerSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 4,
   },
   balanceRow: {
     flexDirection: 'row',
-    alignItems:    'center',
-    gap:           6,
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 6,
   },
   balanceText: {
-    fontSize:   13,
-    fontWeight: '700',
-    color:      '#0f172a',
+    fontSize: 42,
+    fontWeight: '900',
+    color: COLORS.white,
+    letterSpacing: -1,
   },
   balancePts: {
-    color: '#16a34a',
+    fontSize: 18,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 6,
   },
-  balanceSub: {
-    fontSize: 12,
-    color:    '#64748b',
+  headerDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 20,
   },
 
-  // Reward 2-column row
-  rewardRow: {
+  // Glassmorphism Stats
+  statsRow: {
     flexDirection: 'row',
-    gap:           12,
-    marginBottom:  12,
+    gap: 10,
   },
+  statBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  statValRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statEmoji: {
+    fontSize: 14,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+
+  // Rank Progress Card
+  rankContainer: {
+    paddingHorizontal: 20,
+    marginTop: -20, 
+    marginBottom: 10,
+  },
+  rankCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 16,
+    ...Platform.select({
+      ios: { shadowColor: COLORS.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 4 },
+    }),
+  },
+  rankHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rankTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rankIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 196, 199, 0.15)', // lightTeal
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  rankName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  nextRankBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFF8E1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  nextRankText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.orangeDark,
+  },
+  progressTrack: {
+    height: 8,
+    backgroundColor: COLORS.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  rankFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rankFooterText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  rankFooterPoints: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.teal,
+  },
+
+  // Filters
+  filterWrapper: {
+    marginTop: 10,
+  },
+  filterRow: {
+    paddingHorizontal: 20,
+    gap: 10,
+    paddingBottom: 10,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 6,
+  },
+  filterChipActive: {
+    borderColor: COLORS.teal,
+    backgroundColor: 'rgba(0, 196, 199, 0.1)',
+  },
+  filterEmoji: {
+    fontSize: 14,
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  filterTextActive: {
+    color: COLORS.teal,
+    fontWeight: '800',
+  },
+
+  // Rewards Grid
+  rewardsSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.navy,
+    marginBottom: 16,
+  },
+  rewardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10, 
+  },
+  rewardCard: {
+    width: CARD_WIDTH,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    overflow: 'hidden', 
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
+  },
+  rewardCardLocked: {
+    backgroundColor: COLORS.bgGray,
+    borderColor: COLORS.border,
+  },
+  cardTopBorder: {
+    height: 6,
+    width: '100%',
+  },
+  cardInner: {
+    padding: 12,
+    flex: 1,
+  },
+  rewardIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.bgGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  rewardIcon: {
+    fontSize: 18,
+  },
+  rewardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  rewardSub: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+  },
+  spacer: {
+    flex: 1, 
+  },
+  rewardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  pointsWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  rewardPoints: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.navy,
+  },
+  rewardPtsLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+
+  // Normal Redeem Button
+  redeemBtn: {
+    backgroundColor: COLORS.teal,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  redeemBtnText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // Locked Rank Button
+  lockedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  lockedBtnText: {
+    color: COLORS.disabledText,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  }
 })

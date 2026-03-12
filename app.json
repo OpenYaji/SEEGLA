@@ -2,25 +2,29 @@
   "expo": {
     "name": "SEEGLA",
     "slug": "SEEGLA",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logoicon.png",
     "scheme": "seegla",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMotionUsageDescription": "This app needs to use your device motion to track your steps during activities."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+"foregroundImage": "./assets/images/logoicon.png",
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.devyaji.SEEGLA"
+      "package": "com.devyaji.SEEGLA",
+      "permissions": [
+        "ACTIVITY_RECOGNITION"
+      ]
     },
     "web": {
       "output": "static",
@@ -31,10 +35,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#E6F4FE",
           "dark": {
             "backgroundColor": "#000000"
           }
